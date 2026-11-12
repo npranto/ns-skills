@@ -1,0 +1,8 @@
+{
+  "name": "ns-proto-market",
+  "owner": { "name": "spike" },
+  "description": "local spike marketplace",
+  "plugins": [
+    { "name": "ns-proto", "source": "./", "description": "Spike prototype", "category": "engineering" }
+  ]
+}

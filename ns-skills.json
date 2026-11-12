@@ -1,0 +1,80 @@
+{
+  "name": "ns-skills",
+  "version": "0.1.0",
+  "description": "Lean, generic Agent Skills: a router, flows and phases that take engineering work from idea to production with human gates.",
+  "prefix": "ns",
+  "skills": [
+    "ns-flow-architecture",
+    "ns-flow-bugfix",
+    "ns-flow-delegate",
+    "ns-flow-docs",
+    "ns-flow-existing-project",
+    "ns-flow-feature",
+    "ns-flow-new-project",
+    "ns-flow-ticket",
+    "ns-flow-wayfinder",
+    "ns-route",
+    "ns-to-architect",
+    "ns-to-branch",
+    "ns-to-capture-idea",
+    "ns-to-close",
+    "ns-to-deploy",
+    "ns-to-design",
+    "ns-to-discover-codebase",
+    "ns-to-docs",
+    "ns-to-grill-me",
+    "ns-to-implement",
+    "ns-to-integration-check",
+    "ns-to-observe",
+    "ns-to-postmortem",
+    "ns-to-pr",
+    "ns-to-quality-check",
+    "ns-to-review",
+    "ns-to-rollback",
+    "ns-to-save",
+    "ns-to-scope-check",
+    "ns-to-spec",
+    "ns-to-split-ticket",
+    "ns-to-stakeholder-brief",
+    "ns-to-start",
+    "ns-to-tickets",
+    "ns-to-understand",
+    "ns-to-verify",
+    "ns-to-wayfinder"
+  ],
+  "docs": [
+    "README.md",
+    "docs/MAINTENANCE.md"
+  ],
+  "size_exceptions": {},
+  "requirements": {
+    "plugins": {
+      "mattpocock-skills": {
+        "required_by": [],
+        "fallback": "follow the philosophy inline and say so"
+      }
+    },
+    "tools": {
+      "playwright-cli": {
+        "required_by": []
+      },
+      "chrome-devtools-axi": {
+        "required_by": []
+      },
+      "gh-axi": {
+        "required_by": []
+      },
+      "lighthouse": {
+        "required_by": []
+      },
+      "ffmpeg": {
+        "required_by": []
+      },
+      "herdr": {
+        "required_by": [
+          "ns-flow-delegate"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,1424 @@
+{
+ "about": "Expected routing for sample requests, derived only from the baseline ns-route and WORKFLOWS (see each source ledger id). entry lists every acceptable first command. must_include and must_exclude use the shorthand phase names of WORKFLOWS.md.",
+ "requests": [
+  {
+   "id": "greenfield-ui",
+   "request": "I want to build a habit tracker web app. The folder is empty.",
+   "expect": {
+    "task_type": "greenfield",
+    "entry": [
+     "/ns-flow-new-project"
+    ],
+    "must_include": [
+     "start",
+     "capture",
+     "grill",
+     "architect",
+     "design",
+     "spec",
+     "tickets",
+     "integration-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R037",
+    "WORKFLOWS.R008",
+    "WORKFLOWS.R091"
+   ]
+  },
+  {
+   "id": "greenfield-cli",
+   "request": "New command line tool for renaming files in bulk, nothing exists yet, no UI.",
+   "expect": {
+    "task_type": "greenfield",
+    "entry": [
+     "/ns-flow-new-project"
+    ],
+    "must_include": [
+     "start",
+     "capture",
+     "grill",
+     "architect",
+     "spec",
+     "tickets"
+    ],
+    "must_exclude": [
+     "design"
+    ]
+   },
+   "source": [
+    "ns-route.R037",
+    "WORKFLOWS.R008",
+    "WORKFLOWS.R091"
+   ],
+   "note": "design only if there is a UI"
+  },
+  {
+   "id": "greenfield-api",
+   "request": "Start a new internal API service from scratch.",
+   "expect": {
+    "task_type": "greenfield",
+    "entry": [
+     "/ns-flow-new-project"
+    ],
+    "must_include": [
+     "start",
+     "capture",
+     "grill",
+     "architect",
+     "tickets"
+    ],
+    "must_exclude": [
+     "design"
+    ]
+   },
+   "source": [
+    "ns-route.R037",
+    "WORKFLOWS.R008"
+   ]
+  },
+  {
+   "id": "onboard-join",
+   "request": "I just joined this team. Help me understand this codebase before I touch anything.",
+   "expect": {
+    "task_type": "onboard",
+    "entry": [
+     "/ns-flow-existing-project"
+    ],
+    "must_include": [
+     "discover"
+    ],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R009",
+    "WORKFLOWS.R097"
+   ]
+  },
+  {
+   "id": "onboard-then-feature",
+   "request": "Get oriented in this repo, then I want to add dark mode.",
+   "expect": {
+    "task_type": "onboard",
+    "entry": [
+     "/ns-flow-existing-project"
+    ],
+    "must_include": [
+     "discover"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "WORKFLOWS.R009",
+    "WORKFLOWS.R097"
+   ]
+  },
+  {
+   "id": "feature-small",
+   "request": "Add a sort-by-date option to the notes list.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets",
+     "split-ticket",
+     "architect"
+    ]
+   },
+   "source": [
+    "ns-route.R038",
+    "ns-route.R061",
+    "WORKFLOWS.R061",
+    "CONVENTIONS.R091"
+   ],
+   "note": "small scope drops spec and tickets; ordinary feature work does not need architect"
+  },
+  {
+   "id": "feature-csv",
+   "request": "Add CSV export to the reports page.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets",
+     "architect"
+    ]
+   },
+   "source": [
+    "ns-route.R038",
+    "ns-route.R061",
+    "WORKFLOWS.R061"
+   ]
+  },
+  {
+   "id": "feature-workspaces",
+   "request": "Add team workspaces with roles, invitations and per-workspace billing.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "spec",
+     "tickets",
+     "integration-check"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "security": "sensitive"
+    }
+   },
+   "source": [
+    "ns-route.R038",
+    "WORKFLOWS.R010",
+    "WORKFLOWS.R083"
+   ]
+  },
+  {
+   "id": "feature-password-reset",
+   "request": "Add password reset by email link.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "spec",
+     "tickets",
+     "security-review",
+     "integration-check"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "security": "sensitive"
+    }
+   },
+   "source": [
+    "ns-route.R070",
+    "ns-route.R038",
+    "WORKFLOWS.R202"
+   ],
+   "note": "sensitive: security pass in architect, security-review before quality-check"
+  },
+  {
+   "id": "feature-high-risk",
+   "request": "Change how invoices are calculated for every customer.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature"
+    ],
+    "must_include": [
+     "split-ticket",
+     "understand",
+     "review",
+     "verify",
+     "rollback"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "risk": "high"
+    }
+   },
+   "source": [
+    "ns-route.R075",
+    "WORKFLOWS.R203"
+   ]
+  },
+  {
+   "id": "feature-auto",
+   "request": "--auto add a dark mode toggle to settings, saved per user.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-feature",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R038",
+    "ns-route.R084",
+    "CONVENTIONS.R056"
+   ],
+   "note": "autopilot: no between-phase question, but the never-auto-answered gates still stop; a small feature may enter as a ticket (widened in Phase 7: old and new routers both chose /ns-flow-ticket)"
+  },
+  {
+   "id": "ticket-issue",
+   "request": "Do issue 14.",
+   "expect": {
+    "task_type": "ticket",
+    "entry": [
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement",
+     "verify",
+     "understand",
+     "review",
+     "quality-check",
+     "save",
+     "pr",
+     "deploy",
+     "observe",
+     "close"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R011",
+    "WORKFLOWS.R064"
+   ]
+  },
+  {
+   "id": "ticket-file",
+   "request": "Implement .scratch/notes/issues/03-archive-note.md",
+   "expect": {
+    "task_type": "ticket",
+    "entry": [
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "branch",
+     "scope-check",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R011",
+    "WORKFLOWS.R064"
+   ]
+  },
+  {
+   "id": "ticket-tiny",
+   "request": "Rename the Save button label to Submit on the settings form.",
+   "expect": {
+    "task_type": "feature",
+    "entry": [
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets",
+     "split-ticket"
+    ],
+    "modifiers": {
+     "scope": "tiny"
+    }
+   },
+   "source": [
+    "ns-route.R061",
+    "WORKFLOWS.R061"
+   ],
+   "note": "scope-check stays even at tiny scope"
+  },
+  {
+   "id": "delegate-three",
+   "request": "Build tickets 03, 04 and 05 in parallel with agents while I work on something else.",
+   "expect": {
+    "task_type": "ticket",
+    "entry": [
+     "/ns-flow-delegate"
+    ],
+    "must_include": [
+     "branch",
+     "implement"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "sessions": "many"
+    }
+   },
+   "source": [
+    "WORKFLOWS.R012",
+    "WORKFLOWS.R114",
+    "ns-route.R062"
+   ]
+  },
+  {
+   "id": "delegate-high-risk-refused",
+   "request": "Hand ticket 07, the payments database migration, to an agent.",
+   "expect": {
+    "task_type": "migration",
+    "entry": [
+     "/ns-flow-architecture",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "rollback"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "WORKFLOWS.R115",
+    "ns-route.R073"
+   ],
+   "note": "high risk and migrations are never delegated, built with the user"
+  },
+  {
+   "id": "bug-emoji",
+   "request": "Users cannot archive a note when the title contains an emoji.",
+   "expect": {
+    "task_type": "bug",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "diagnose",
+     "scope-check",
+     "implement",
+     "verify",
+     "understand",
+     "review",
+     "quality-check",
+     "save",
+     "pr"
+    ],
+    "must_exclude": [
+     "spec"
+    ]
+   },
+   "source": [
+    "ns-route.R039",
+    "WORKFLOWS.R013",
+    "WORKFLOWS.R121"
+   ],
+   "note": "reproduce end to end before any fix; spec only for non-trivial"
+  },
+  {
+   "id": "bug-plus-email",
+   "request": "Login crashes with a TypeError when the email contains a plus sign.",
+   "expect": {
+    "task_type": "bug",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "diagnose",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R039",
+    "WORKFLOWS.R013"
+   ]
+  },
+  {
+   "id": "bug-safari",
+   "request": "The export button does nothing on Safari.",
+   "expect": {
+    "task_type": "bug",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "diagnose",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R039",
+    "WORKFLOWS.R013"
+   ]
+  },
+  {
+   "id": "bug-duplicates",
+   "request": "Search returns duplicate rows when two tags match.",
+   "expect": {
+    "task_type": "bug",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "diagnose",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R039",
+    "WORKFLOWS.R013"
+   ]
+  },
+  {
+   "id": "incident-checkout",
+   "request": "Production checkout is down, customers are getting 500s.",
+   "expect": {
+    "task_type": "incident",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "mitigate-first",
+     "rollback",
+     "observe",
+     "postmortem",
+     "close"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "risk": "critical"
+    }
+   },
+   "source": [
+    "ns-route.R040",
+    "WORKFLOWS.R014",
+    "WORKFLOWS.R127",
+    "ns-route.R055"
+   ],
+   "note": "stop the harm first; risk forced to critical; rollback prepare mandatory"
+  },
+  {
+   "id": "incident-leaked-keys",
+   "request": "We just pushed live API keys to a public repo.",
+   "expect": {
+    "task_type": "incident",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "mitigate-first",
+     "postmortem"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "risk": "critical"
+    }
+   },
+   "source": [
+    "ns-route.R040",
+    "WORKFLOWS.R014"
+   ]
+  },
+  {
+   "id": "incident-slow-after-deploy",
+   "request": "Error rate is spiking and the site is crawling since the last deploy.",
+   "expect": {
+    "task_type": "incident",
+    "entry": [
+     "/ns-flow-bugfix"
+    ],
+    "must_include": [
+     "mitigate-first",
+     "rollback",
+     "observe"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "risk": "critical"
+    }
+   },
+   "source": [
+    "ns-route.R040",
+    "WORKFLOWS.R014",
+    "WORKFLOWS.R128"
+   ]
+  },
+  {
+   "id": "arch-graphql",
+   "request": "Should we move the mobile API from REST to GraphQL?",
+   "expect": {
+    "task_type": "architecture",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "grill",
+     "architect"
+    ],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "ns-route.R047",
+    "WORKFLOWS.R015",
+    "WORKFLOWS.R134"
+   ]
+  },
+  {
+   "id": "arch-multitenancy",
+   "request": "Decide how we handle multi-tenancy before we build more.",
+   "expect": {
+    "task_type": "architecture",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "grill",
+     "architect"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R047",
+    "WORKFLOWS.R015"
+   ]
+  },
+  {
+   "id": "arch-cache",
+   "request": "Pick a caching strategy for the product pages.",
+   "expect": {
+    "task_type": "architecture",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "grill",
+     "architect"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R047",
+    "WORKFLOWS.R015"
+   ]
+  },
+  {
+   "id": "migration-sqlite-pg",
+   "request": "Move the notes data from SQLite to Postgres.",
+   "expect": {
+    "task_type": "migration",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "spec",
+     "tickets",
+     "rollback",
+     "quality-check"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "data": "migration"
+    }
+   },
+   "source": [
+    "ns-route.R050",
+    "ns-route.R073",
+    "WORKFLOWS.R016",
+    "WORKFLOWS.R141"
+   ],
+   "note": "expand/contract; migration-safety stage and rollback prepare mandatory"
+  },
+  {
+   "id": "migration-backfill-drop",
+   "request": "Add a nullable region column to orders, backfill it, then drop the old column.",
+   "expect": {
+    "task_type": "migration",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "architect",
+     "tickets",
+     "rollback",
+     "quality-check"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "data": "destructive"
+    }
+   },
+   "source": [
+    "ns-route.R074",
+    "WORKFLOWS.R142"
+   ],
+   "note": "destructive step needs its own authorization gate and a backup/restore plan"
+  },
+  {
+   "id": "migration-queue",
+   "request": "Switch our job queue provider to a new vendor.",
+   "expect": {
+    "task_type": "migration",
+    "entry": [
+     "/ns-flow-architecture"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "rollback"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R050",
+    "WORKFLOWS.R016"
+   ]
+  },
+  {
+   "id": "wayfinder-replatform",
+   "request": "We must replatform the whole product, with many unknowns in auth, data and billing, over several weeks.",
+   "expect": {
+    "task_type": "wayfinder",
+    "entry": [
+     "/ns-flow-wayfinder"
+    ],
+    "must_include": [
+     "wayfinder"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "uncertainty": "high",
+     "scope": "program",
+     "sessions": "many"
+    }
+   },
+   "source": [
+    "ns-route.R057",
+    "WORKFLOWS.R017",
+    "WORKFLOWS.R146"
+   ]
+  },
+  {
+   "id": "wayfinder-provider-swap",
+   "request": "A multi-quarter provider swap with lots of interlocking unknowns.",
+   "expect": {
+    "task_type": "wayfinder",
+    "entry": [
+     "/ns-flow-wayfinder"
+    ],
+    "must_include": [
+     "wayfinder"
+    ],
+    "must_exclude": [],
+    "modifiers": {
+     "uncertainty": "high",
+     "scope": "large",
+     "sessions": "many"
+    }
+   },
+   "source": [
+    "ns-route.R057",
+    "WORKFLOWS.R017"
+   ]
+  },
+  {
+   "id": "refactor-dates",
+   "request": "Extract the duplicated date formatting into one helper.",
+   "expect": {
+    "task_type": "refactor",
+    "entry": [
+     "/ns-route",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets"
+    ]
+   },
+   "source": [
+    "ns-route.R041",
+    "WORKFLOWS.R018",
+    "WORKFLOWS.R153"
+   ],
+   "note": "scope-check is the key gate: no bundled renames beyond the goal"
+  },
+  {
+   "id": "techdebt-utils",
+   "request": "Clean up this messy utils file while I am here.",
+   "expect": {
+    "task_type": "refactor",
+    "entry": [
+     "/ns-route",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement"
+    ],
+    "must_exclude": [
+     "spec"
+    ]
+   },
+   "source": [
+    "ns-route.R042",
+    "WORKFLOWS.R018"
+   ]
+  },
+  {
+   "id": "refactor-rename",
+   "request": "Rename internal functions for consistency across the repo.",
+   "expect": {
+    "task_type": "refactor",
+    "entry": [
+     "/ns-route",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement"
+    ],
+    "must_exclude": [
+     "spec"
+    ]
+   },
+   "source": [
+    "ns-route.R041",
+    "WORKFLOWS.R018"
+   ]
+  },
+  {
+   "id": "restructure-billing",
+   "request": "Untangle the billing module and change its data model, behavior must not change.",
+   "expect": {
+    "task_type": "restructure",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "grill",
+     "architect",
+     "tickets",
+     "integration-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R043",
+    "WORKFLOWS.R019",
+    "WORKFLOWS.R159"
+   ]
+  },
+  {
+   "id": "restructure-state",
+   "request": "Replace our custom state pattern everywhere, inside the same stack.",
+   "expect": {
+    "task_type": "restructure",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "architect",
+     "tickets"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R043",
+    "WORKFLOWS.R019"
+   ]
+  },
+  {
+   "id": "stackmove-cra-next",
+   "request": "Migrate our Create React App to Next.js piece by piece while it stays live.",
+   "expect": {
+    "task_type": "stack-move",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "architect",
+     "tickets",
+     "integration-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R044",
+    "WORKFLOWS.R020",
+    "WORKFLOWS.R162"
+   ]
+  },
+  {
+   "id": "stackmove-express-fastify",
+   "request": "Move the API from Express to Fastify.",
+   "expect": {
+    "task_type": "stack-move",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "architect",
+     "tickets"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R044",
+    "WORKFLOWS.R020"
+   ]
+  },
+  {
+   "id": "rebuild-admin",
+   "request": "Rebuild our existing admin tool as a new product, using the old one as the reference.",
+   "expect": {
+    "task_type": "rebuild",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "capture"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R045",
+    "WORKFLOWS.R021",
+    "WORKFLOWS.R165"
+   ],
+   "note": "baseline of the reference product, then greenfield"
+  },
+  {
+   "id": "modernize-legacy",
+   "request": "This legacy module has almost no tests. Make it safe to change.",
+   "expect": {
+    "task_type": "modernize",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "verify:baseline",
+     "implement"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R046",
+    "WORKFLOWS.R022",
+    "WORKFLOWS.R168"
+   ]
+  },
+  {
+   "id": "perf-search",
+   "request": "The search endpoint is slow, p95 is 3 seconds.",
+   "expect": {
+    "task_type": "performance",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "discover",
+     "diagnose",
+     "implement",
+     "verify"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R048",
+    "WORKFLOWS.R023",
+    "WORKFLOWS.R171"
+   ]
+  },
+  {
+   "id": "perf-bundle",
+   "request": "Our JavaScript bundle is huge and pages load slowly.",
+   "expect": {
+    "task_type": "performance",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "discover",
+     "diagnose",
+     "implement"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R048",
+    "WORKFLOWS.R023"
+   ]
+  },
+  {
+   "id": "dep-react-major",
+   "request": "Bump react from 18 to 19.",
+   "expect": {
+    "task_type": "dependency",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "spec",
+     "tickets",
+     "quality-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R049",
+    "WORKFLOWS.R024",
+    "WORKFLOWS.R176"
+   ],
+   "note": "major version with wide blast radius: spec and tickets instead of a single ticket"
+  },
+  {
+   "id": "dep-lodash-patch",
+   "request": "Bump lodash to the latest patch version.",
+   "expect": {
+    "task_type": "dependency",
+    "entry": [
+     "/ns-route",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement",
+     "quality-check"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets"
+    ]
+   },
+   "source": [
+    "ns-route.R049",
+    "WORKFLOWS.R175"
+   ],
+   "note": "scope-check: only the requested bump; quality-check dependencies stage"
+  },
+  {
+   "id": "dep-remove",
+   "request": "Remove the unused left-pad package.",
+   "expect": {
+    "task_type": "dependency",
+    "entry": [
+     "/ns-route",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [
+     "scope-check",
+     "implement"
+    ],
+    "must_exclude": [
+     "spec"
+    ]
+   },
+   "source": [
+    "ns-route.R049",
+    "WORKFLOWS.R175"
+   ]
+  },
+  {
+   "id": "infra-ci",
+   "request": "Move our CI from Jenkins to GitHub Actions.",
+   "expect": {
+    "task_type": "infrastructure",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "quality-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R051",
+    "WORKFLOWS.R025",
+    "WORKFLOWS.R179"
+   ]
+  },
+  {
+   "id": "infra-observability",
+   "request": "Add a dashboard and alerts for the API.",
+   "expect": {
+    "task_type": "infrastructure",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "grill",
+     "implement",
+     "quality-check"
+    ],
+    "must_exclude": []
+   },
+   "source": [
+    "ns-route.R051",
+    "WORKFLOWS.R025"
+   ]
+  },
+  {
+   "id": "spike-sqlite",
+   "request": "Can we use SQLite instead of Postgres here? Just investigate.",
+   "expect": {
+    "task_type": "spike",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "research"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets",
+     "pr"
+    ]
+   },
+   "source": [
+    "ns-route.R052",
+    "WORKFLOWS.R026",
+    "WORKFLOWS.R182"
+   ],
+   "note": "throwaway: no spec, tickets, tests or PR"
+  },
+  {
+   "id": "spike-websockets",
+   "request": "Try whether websockets can handle live cursors at our scale. Do not ship anything.",
+   "expect": {
+    "task_type": "spike",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "prototype"
+    ],
+    "must_exclude": [
+     "spec",
+     "tickets",
+     "pr"
+    ]
+   },
+   "source": [
+    "ns-route.R052",
+    "WORKFLOWS.R026"
+   ]
+  },
+  {
+   "id": "proposal-sso",
+   "request": "Leadership wants a plan and an estimate for adding SSO before we commit.",
+   "expect": {
+    "task_type": "proposal",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "capture",
+     "grill",
+     "spec",
+     "tickets"
+    ],
+    "must_exclude": [
+     "implement",
+     "pr",
+     "deploy"
+    ]
+   },
+   "source": [
+    "ns-route.R053",
+    "WORKFLOWS.R027",
+    "WORKFLOWS.R187"
+   ],
+   "note": "planning only"
+  },
+  {
+   "id": "proposal-offline",
+   "request": "Write up a design and estimate for offline mode.",
+   "expect": {
+    "task_type": "proposal",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [
+     "grill",
+     "architect",
+     "spec",
+     "tickets"
+    ],
+    "must_exclude": [
+     "implement",
+     "pr"
+    ]
+   },
+   "source": [
+    "ns-route.R053",
+    "WORKFLOWS.R027"
+   ]
+  },
+  {
+   "id": "docs-readme",
+   "request": "The README setup steps are out of date after the Docker change.",
+   "expect": {
+    "task_type": "docs",
+    "entry": [
+     "/ns-flow-docs"
+    ],
+    "must_include": [
+     "branch",
+     "docs",
+     "review",
+     "quality-check",
+     "save",
+     "pr"
+    ],
+    "must_exclude": [
+     "implement",
+     "spec"
+    ]
+   },
+   "source": [
+    "ns-route.R054",
+    "WORKFLOWS.R028",
+    "WORKFLOWS.R192"
+   ],
+   "note": "review parts D and F only"
+  },
+  {
+   "id": "docs-after-refactor",
+   "request": "Update the docs after the auth refactor.",
+   "expect": {
+    "task_type": "docs",
+    "entry": [
+     "/ns-flow-docs"
+    ],
+    "must_include": [
+     "docs",
+     "save",
+     "pr"
+    ],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "ns-route.R054",
+    "WORKFLOWS.R028"
+   ]
+  },
+  {
+   "id": "docs-typo",
+   "request": "Fix the typo recieves in the README.",
+   "expect": {
+    "task_type": "docs",
+    "entry": [
+     "/ns-flow-docs",
+     "/ns-flow-ticket"
+    ],
+    "must_include": [],
+    "must_exclude": [
+     "spec",
+     "tickets"
+    ],
+    "modifiers": {
+     "scope": "tiny"
+    },
+    "include_if_entry": {
+     "/ns-flow-ticket": [
+      "scope-check"
+     ]
+    }
+   },
+   "source": [
+    "ns-route.R054",
+    "ns-route.R061",
+    "WORKFLOWS.R028"
+   ],
+   "note": "either entry is allowed by the baseline; /ns-flow-docs has no scope-check phase, /ns-flow-ticket does (fixed in Phase 7: both routers chose /ns-flow-docs)"
+  },
+  {
+   "id": "pr-review-482",
+   "request": "Review PR 482 for the payments service.",
+   "expect": {
+    "task_type": "pr-review",
+    "entry": [
+     "/ns-to-understand"
+    ],
+    "must_include": [
+     "understand",
+     "review"
+    ],
+    "must_exclude": [
+     "implement",
+     "save",
+     "pr",
+     "deploy"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R029",
+    "WORKFLOWS.R195",
+    "WORKFLOWS.R196"
+   ],
+   "note": "read-only; findings are posted only with approval"
+  },
+  {
+   "id": "pr-review-teammate",
+   "request": "Look at my teammate's PR number 77 and tell me what is wrong with it.",
+   "expect": {
+    "task_type": "pr-review",
+    "entry": [
+     "/ns-to-understand"
+    ],
+    "must_include": [
+     "understand",
+     "review"
+    ],
+    "must_exclude": [
+     "implement",
+     "save"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R029",
+    "WORKFLOWS.R195"
+   ]
+  },
+  {
+   "id": "ship-approved",
+   "request": "PR 482 is approved. Ship it.",
+   "expect": {
+    "task_type": "ship",
+    "entry": [
+     "/ns-route",
+     "/ns-to-deploy"
+    ],
+    "must_include": [
+     "deploy",
+     "observe",
+     "close"
+    ],
+    "must_exclude": [
+     "implement",
+     "spec"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R030",
+    "WORKFLOWS.R199"
+   ]
+  },
+  {
+   "id": "ship-release",
+   "request": "Release the reviewed PR to production.",
+   "expect": {
+    "task_type": "ship",
+    "entry": [
+     "/ns-route",
+     "/ns-to-deploy"
+    ],
+    "must_include": [
+     "deploy",
+     "observe",
+     "close"
+    ],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "WORKFLOWS.R030",
+    "WORKFLOWS.R199"
+   ]
+  },
+  {
+   "id": "vague-help",
+   "request": "Help me with this repo.",
+   "expect": {
+    "task_type": "unknown",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [],
+    "must_exclude": [
+     "implement",
+     "save",
+     "pr"
+    ]
+   },
+   "source": [
+    "ns-route.R014",
+    "WORKFLOWS.R031"
+   ],
+   "note": "classify first: ask what the task is, never invent one"
+  },
+  {
+   "id": "menu",
+   "request": "menu",
+   "expect": {
+    "task_type": "menu",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "ns-route.R010"
+   ],
+   "note": "print the workflow menu and stop"
+  },
+  {
+   "id": "status",
+   "request": "Where am I?",
+   "expect": {
+    "task_type": "status",
+    "entry": [
+     "/ns-route"
+    ],
+    "must_include": [],
+    "must_exclude": [
+     "implement"
+    ]
+   },
+   "source": [
+    "ns-route.R011",
+    "ns-route.R099"
+   ],
+   "note": "read-only status view from disk and remote, then stop"
+  }
+ ]
+}

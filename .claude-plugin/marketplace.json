@@ -1,0 +1,8 @@
+{
+  "name": "ns-skills",
+  "owner": { "name": "ns-skills" },
+  "description": "ns-skills marketplace",
+  "plugins": [
+    { "name": "ns-skills", "source": "./", "description": "Lean, generic Agent Skills with human gates.", "category": "engineering" }
+  ]
+}

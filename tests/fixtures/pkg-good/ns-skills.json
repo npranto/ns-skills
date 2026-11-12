@@ -1,0 +1,10 @@
+{
+  "name": "ns-skills",
+  "version": "0.0.1",
+  "description": "fixture",
+  "prefix": "ns",
+  "skills": ["ns-flow-demo", "ns-route", "ns-to-demo"],
+  "docs": [],
+  "size_exceptions": {},
+  "requirements": { "plugins": {}, "tools": {} }
+}

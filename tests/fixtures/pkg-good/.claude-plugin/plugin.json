@@ -1,0 +1,1 @@
+{ "name": "ns-skills", "version": "0.0.1", "description": "fixture", "skills": ["./skills/ns-flow-demo", "./skills/ns-route", "./skills/ns-to-demo"] }

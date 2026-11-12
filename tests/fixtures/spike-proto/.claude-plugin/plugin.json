@@ -1,0 +1,6 @@
+{
+  "name": "ns-proto",
+  "version": "0.0.1",
+  "description": "Spike prototype for ns-skills layout tests",
+  "skills": ["./skills/ns-route", "./skills/ns-to-demo", "./skills/ns-flow-demo"]
+}

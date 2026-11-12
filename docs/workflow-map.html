@@ -1,0 +1,735 @@
+<title>Skill Route Map</title>
+<meta name="description" content="Visual map of the ns-* engineering workflows: which skills run in which order, where the human gates are, and how to run each one by hand or on autopilot.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #F3F5F7;
+  --surface: #FFFFFF;
+  --ink: #141C24;
+  --muted: #56636F;
+  --rule: #D6DCE2;
+  --soft: #E9EDF1;
+  --build: #1D5FD1;
+  --fix: #C93636;
+  --structure: #7447BE;
+  --maintain: #0A817D;
+  --explore: #A87200;
+  --release: #218A4B;
+  --gate: #141C24;
+  --font: "Overpass", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E1318; --surface: #151C23; --ink: #E4EAEF; --muted: #97A5B2; --rule: #2A353F; --soft: #1C252E;
+    --build: #72A0F3; --fix: #F07A7A; --structure: #AE8DE9; --maintain: #43C2BB; --explore: #E6B84A; --release: #5DCB8B;
+    --gate: #E4EAEF;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1318; --surface: #151C23; --ink: #E4EAEF; --muted: #97A5B2; --rule: #2A353F; --soft: #1C252E;
+  --build: #72A0F3; --fix: #F07A7A; --structure: #AE8DE9; --maintain: #43C2BB; --explore: #E6B84A; --release: #5DCB8B;
+  --gate: #E4EAEF;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 15px/1.55 var(--font);
+  padding-inline: 16px; margin: 0;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 120px; display: grid; gap: 56px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-weight: 800; font-size: clamp(34px, 6vw, 56px); letter-spacing: -0.02em; }
+h2 { font-weight: 800; font-size: 26px; letter-spacing: -0.01em; }
+h3 { font-weight: 800; font-size: 20px; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--build); outline-offset: 2px; border-radius: 4px; }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.section-head { display: grid; gap: 8px; margin-bottom: 20px; }
+.section-head p { color: var(--muted); }
+
+/* Header */
+header { display: grid; gap: 16px; }
+header .lede { font-size: 18px; color: var(--muted); max-width: 64ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.legend .stop { width: auto; }
+.legend-item .track { width: 44px; }
+
+/* Stations */
+.line { display: flex; flex-wrap: wrap; row-gap: 16px; padding-block: 4px; }
+.stop { --c: var(--build); display: flex; flex-direction: column; align-items: center; width: 104px; flex: 0 0 auto; text-align: center; }
+.stop.wide { width: 132px; }
+.track { position: relative; height: 24px; width: 100%; display: flex; align-items: center; justify-content: center; }
+.track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 5px; margin-top: -2.5px; background: var(--c); }
+.line > .stop:first-child .track::before { left: 50%; }
+.line > .stop:last-child .track::before { right: 50%; }
+.legend .track::before { left: 0; right: 0; }
+.dot { position: relative; width: 18px; height: 18px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--surface); }
+.opt .dot { background: var(--surface); box-shadow: inset 0 0 0 3px var(--c), 0 0 0 3px var(--surface); }
+.pseudo .dot { width: 12px; height: 12px; }
+.diamond { position: relative; width: 16px; height: 16px; transform: rotate(45deg); background: var(--gate); box-shadow: 0 0 0 3px var(--surface); border-radius: 2px; }
+.opt .diamond { background: var(--surface); box-shadow: inset 0 0 0 3px var(--gate), 0 0 0 3px var(--surface); }
+.pill { position: relative; font: 600 11px var(--mono); letter-spacing: 0.06em; color: var(--surface); background: var(--c); padding: 3px 9px 2px; border-radius: 999px; box-shadow: 0 0 0 3px var(--surface); }
+.opt .pill { color: var(--c); background: var(--surface); box-shadow: inset 0 0 0 2px var(--c), 0 0 0 3px var(--surface); }
+.lbls { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 7px; padding-inline: 4px; }
+.lbl { background: none; border: 0; padding: 1px 3px; cursor: pointer; font-weight: 600; font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; border-radius: 4px; }
+.lbl:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pseudo .lbl { font-weight: 400; color: var(--muted); }
+.or { font: 400 11px var(--mono); color: var(--muted); }
+.note { font-size: 11.5px; line-height: 1.3; color: var(--muted); padding-inline: 4px; margin-top: 2px; }
+.badges { display: flex; gap: 4px; justify-content: center; margin-top: 3px; }
+.badge { font: 600 10.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--soft); color: var(--muted); }
+.fork { display: grid; gap: 12px; margin: 10px 0 0 40px; padding-left: 16px; border-left: 2px dashed var(--rule); }
+.branch { display: grid; gap: 4px; }
+.blabel { font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.gotos { display: flex; flex-wrap: wrap; gap: 8px; }
+.goto { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px 4px 5px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); text-decoration: none; font-size: 13px; font-weight: 600; }
+.goto:hover { border-color: var(--muted); }
+
+/* Route bullets */
+.bullet { --c: var(--build); flex: 0 0 auto; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--c); color: var(--surface); font: 600 11px var(--mono); letter-spacing: 0.02em; }
+.goto .bullet { width: 22px; height: 22px; border-radius: 6px; font-size: 9.5px; }
+
+/* Finder */
+.finder { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.find { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; text-decoration: none; }
+.find:hover { border-color: var(--muted); }
+.find .have { flex: 1; font-size: 14px; line-height: 1.35; }
+.find .to { font: 600 12px var(--mono); color: var(--muted); white-space: nowrap; }
+
+/* Blocks and workflow cards */
+.blocks, .cards { display: grid; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px; display: grid; gap: 14px; scroll-margin-top: 20px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; }
+.card-head .title { display: grid; gap: 2px; flex: 1 1 260px; }
+.card-head .group { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.when { color: var(--muted); }
+.run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cmd { display: inline-flex; align-items: center; gap: 8px; font: 400 13px var(--mono); background: var(--soft); border-radius: 8px; padding: 6px 6px 5px 10px; max-width: 100%; }
+.cmd span { overflow-wrap: anywhere; }
+.copy { border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; font: 600 11px var(--mono); padding: 3px 7px 2px; cursor: pointer; }
+.copy:hover { border-color: var(--muted); }
+.auto { font: 600 11px var(--mono); color: var(--muted); }
+.notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; color: var(--muted); max-width: 90ch; }
+.loopnote { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.chip { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 5px 12px 4px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.search { flex: 1 1 220px; min-width: 0; max-width: 340px; margin-left: auto; padding: 7px 12px 6px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); font: 400 14px var(--font); color: var(--ink); }
+.empty { color: var(--muted); padding: 20px 0; }
+
+/* Run modes and gates */
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.mode { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.mode h3 { font-size: 16px; }
+.mode p { font-size: 14px; color: var(--muted); }
+.gates { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+.gates ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.gates .mode h3 { display: flex; align-items: center; gap: 10px; }
+.gates .stop { width: auto; }
+.gates .diamond, .gates .dot { flex: 0 0 auto; }
+
+/* Inventory */
+.inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.inv button { text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; cursor: pointer; display: grid; gap: 4px; }
+.inv button:hover { border-color: var(--muted); }
+.inv .n { font: 600 13px var(--mono); }
+.inv .d { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.inv-sub { margin: 24px 0 10px; }
+
+/* Drawer */
+.drawer { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 18px 50px rgba(10, 20, 30, 0.22); padding: 18px 20px 20px; display: grid; gap: 10px; z-index: 10; }
+.drawer-head { display: flex; align-items: start; gap: 10px; }
+.drawer-head h3 { flex: 1; font-size: 19px; overflow-wrap: anywhere; }
+.close { border: 1px solid var(--rule); background: var(--surface); border-radius: 8px; padding: 3px 9px 2px; cursor: pointer; font-weight: 600; }
+.drawer dl { margin: 0; display: grid; gap: 8px; }
+.drawer dt { font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.drawer dd { margin: 0; font-size: 14px; }
+.drawer .gotos { margin-top: 2px; }
+
+footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; border-top: 1px solid var(--rule); padding-top: 18px; }
+
+@media (max-width: 520px) {
+  .stop { width: 92px; }
+  .stop.wide { width: 112px; }
+  .card { padding: 16px; }
+  .fork { margin-left: 12px; }
+  .search { max-width: none; margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ns-skills</div>
+    <h1>Skill Route Map</h1>
+    <p class="lede">Every engineering workflow in the ns-* skill family, drawn as a line of stations. Pick your situation, follow the line, and click any station to see what that skill does, what it writes, and where else it runs.</p>
+    <div class="legend" aria-label="Legend">
+      <span class="legend-item"><span class="stop"><span class="track"><span class="dot"></span></span></span>skill runs</span>
+      <span class="legend-item"><span class="stop opt"><span class="track"><span class="dot"></span></span></span>runs only when its note applies</span>
+      <span class="legend-item"><span class="stop"><span class="track"><span class="diamond"></span></span></span>stops for you, even on autopilot</span>
+      <span class="legend-item"><span class="stop"><span class="track"><span class="pill">TICKET</span></span></span>shared block</span>
+      <span class="legend-item"><span class="badge">×N</span> once per ticket</span>
+      <span class="legend-item"><span class="badge">⟲</span> repeats across sessions</span>
+    </div>
+  </header>
+
+  <section id="find">
+    <div class="section-head">
+      <div class="eyebrow">Start here</div>
+      <h2>Pick a workflow</h2>
+      <p>Find what you have in hand. Unsure? Run <code>/ns-route &lt;task&gt;</code> and it classifies the task, picks the workflow, and adjusts it for risk, security, data, and scope.</p>
+    </div>
+    <div class="finder" id="finder"></div>
+  </section>
+
+  <section id="run">
+    <div class="section-head">
+      <div class="eyebrow">Run modes</div>
+      <h2>Four ways to run any workflow</h2>
+      <p>Every file edit is approved by you, one file at a time, in every mode except "hand to an agent", where an agent works alone in its own worktree and you review what it decided before anything merges. Autopilot needs an interactive session (terminal, IDE, or Herdr pane) because of the approvals.</p>
+    </div>
+    <div class="modes">
+      <div class="mode"><h3>By hand</h3><p>Pick "by hand" at <code>/ns-route</code> and it prints every station as an exact command with its real arguments, or type each one from the line yourself. Files on disk carry the handoff, so clearing context between steps is safe. Lost your place? <code>/ns-route status</code>.</p><span class="cmd"><span>/ns-route status</span></span></div>
+      <div class="mode"><h3>Flow, step mode</h3><p>Run the flow command. It pauses after every station to ask: continue, redo, or stop.</p><span class="cmd"><span>/ns-flow-feature "wishlist sorting"</span></span></div>
+      <div class="mode"><h3>Flow, autopilot</h3><p>Add <code>--auto</code>. It asks its setup questions once, then runs to the end, stopping only at diamond stations.</p><span class="cmd"><span>/ns-flow-feature "wishlist sorting" --auto</span></span></div>
+      <div class="mode"><h3>Hand to an agent</h3><p>An agent builds a low or medium risk ticket alone in its own worktree and comes back with a review-ready PR and a list of what it decided without you. You review, then ship it through the release card. You can also send any flow command to another Claude session or Herdr pane to run it there with your approvals.</p><span class="cmd"><span>/ns-flow-delegate &lt;ticket&gt; &lt;ticket&gt;</span></span></div>
+    </div>
+    <div class="gates">
+      <div class="mode">
+        <h3><span class="stop"><span class="track" style="width:20px"><span class="dot"></span></span></span>Autopilot answers for you</h3>
+        <ul>
+          <li>Continue, redo, or stop between stations</li>
+          <li>The quality-check stage plan and Run or Skip per observe check (recommended choice)</li>
+          <li>Branch name and base, docs scope, the understand brief's closing question</li>
+          <li>Offers to write an artifact (the file write itself still needs your approval)</li>
+          <li>Optional extras the workflow does not require, such as a shareable stakeholder page: skipped</li>
+        </ul>
+      </div>
+      <div class="mode">
+        <h3><span class="stop"><span class="track" style="width:20px"><span class="diamond"></span></span></span>Always stops for you</h3>
+        <ul>
+          <li>Every project file change</li>
+          <li>Decisions in grill, wayfinder, architect, and design; ADRs; the High-tier observation window and rollback threshold</li>
+          <li>Approvals: spec, tickets, split-ticket breakdown, a bug's fix plan, restated scope for a task with no ticket, scope-check trims, flags, and design choices, which review findings to fix, integration-check gaps</li>
+          <li>Every commit</li>
+          <li>Push and open the PR (which also approves that PR's reports and evidence page), the release card (your answer is the merge), promote, a flag change, rollback, destructive data changes, external tracker writes, any other comment or published page</li>
+          <li>Anything that could lose uncommitted work</li>
+          <li>Trouble: missing input, an escalation, a phase that fails twice, UNHEALTHY, NOT CLOSED, unexpected errors</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="blocks">
+    <div class="section-head">
+      <div class="eyebrow">Interchanges</div>
+      <h2>Shared blocks</h2>
+      <p>Three segments that many lines pass through. A pill station on any line means "run this whole block here".</p>
+    </div>
+    <div class="blocks" id="blockList"></div>
+  </section>
+
+  <section id="workflows">
+    <div class="section-head">
+      <div class="eyebrow">Lines</div>
+      <h2>All workflows</h2>
+    </div>
+    <div class="toolbar" id="toolbar"></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section id="inventory">
+    <div class="section-head">
+      <div class="eyebrow">Stations</div>
+      <h2>Skill inventory</h2>
+      <p>Every skill the lines use. Phase skills are manual-only: flows read their SKILL.md instead of calling them through the harness's skill-invocation tool.</p>
+    </div>
+    <div class="inv" id="invPhases"></div>
+    <h3 class="inv-sub">Other skills the lines use</h3>
+    <div class="inv" id="invOther"></div>
+    <h3 class="inv-sub">Not on any line</h3>
+    <div class="inv" id="invNot"></div>
+  </section>
+
+  <footer>
+    <div>Source of truth: <code>skills/ns-route/references/workflows/</code> for the lines, <code>core.md</code> one level up for the rules, each flow's <code>SKILL.md</code> for step-by-step detail.</div>
+    <div id="synced"></div>
+  </footer>
+</div>
+
+<aside class="drawer" id="drawer" hidden aria-live="polite">
+  <div class="drawer-head"><h3 id="dTitle"></h3><button class="close" id="dClose" type="button" aria-label="Close details">Close</button></div>
+  <dl id="dBody"></dl>
+</aside>
+
+<script>
+// Keep in sync with the workflows folder (skills/ns-route/references/workflows/). Update SYNCED whenever this data changes.
+const SYNCED = "2026-10-14";
+
+const GROUPS = {
+  build: { label: "Build", color: "var(--build)" },
+  fix: { label: "Fix", color: "var(--fix)" },
+  structure: { label: "Change structure", color: "var(--structure)" },
+  maintain: { label: "Maintain", color: "var(--maintain)" },
+  explore: { label: "Explore and plan", color: "var(--explore)" },
+  release: { label: "Release", color: "var(--release)" },
+};
+
+// Station tokens: "name", "name?" optional, "name◆" stops for you, "×N" per ticket, "⟲" repeats,
+// "(note)" small caption, "[BLOCK]" shared block, "a | b" either one.
+const BLOCKS = {
+  PLAN: {
+    group: "explore",
+    title: "[PLAN]",
+    steps: ["discover? (unfamiliar or stale map)", "grill◆", "architect?◆ (structural boundary)", "design?◆ (UI changes)", "spec◆", "tickets◆"],
+    notes: ["Every decision in grill, architect, and design ends with a Learn box naming its principle (principles.md in the references folder). One-way doors are decided first.",
+      "spec is sized to the work: none for one ticket, one page for two to four, the full template for a project.",
+      "tickets: dependencies first, then riskiest first. A multi-ticket feature decides its release strategy (one flag, visible, or ordered) here.",
+      "Tiny or small scope: drop spec and tickets and send the task description straight to [TICKET]."],
+  },
+  TICKET: {
+    group: "build",
+    title: "[TICKET]",
+    cmd: "/ns-flow-ticket <ticket | id | \"task\">",
+    steps: ["split-ticket?◆ (fails sizing test)", "branch", "scope-check (stops to trim, flag, or choose a design)", "implement (writes the kept tests)", "verify◆ (local, full proof)", "understand", "review◆ (13 parts)", "quality-check◆ (stage plan, always last)", "save◆", "pr◆ (reports, preview check, stakeholder review)", "rollback?◆ (prepare, high risk)", "deploy◆ (release card = the merge)", "verify (production)", "observe (logs first)",
+      { fork: [
+        { label: "HEALTHY", steps: ["stakeholder-brief (the Shipped comment)", "close (names the next ticket)"] },
+        { label: "UNHEALTHY ◆", steps: ["mitigate first◆", "rollback◆ (execute)", "verify (production)", "observe"] },
+      ] }],
+    loop: "Blocking findings in verify, review, or quality-check go back to implement, then re-run that station and quality-check.",
+    notes: ["One ticket to production: it is done when it is live, healthy, and closed, and the next ticket starts after that.", "Opening the PR also approves its report set: the description, the local, preview, and production proof with a private evidence page, the stakeholder review, and the Shipped comment.", "The release card is the only merge. \"Leave the PR open\" stops there; rerun to continue.", "rollback prepare is mandatory for high or critical risk, incidents, migrations, and destructive data changes."],
+  },
+  "FEATURE-END": {
+    group: "release",
+    title: "[FEATURE-END]",
+    steps: ["integration-check (base and production)", "flag on?◆ (flagged features)", "stakeholder-brief◆ (one Shipped report for the feature)"],
+    notes: ["Once every ticket of a multi-ticket feature has closed.", "An integration gap becomes a new ticket, an inline fix, or a spec correction, never a silent patch."],
+  },
+};
+
+const WORKFLOWS = [
+  { id: "greenfield", code: "GR", group: "build", have: "An empty directory and an idea",
+    when: "A brand-new project, from idea to a healthy release.",
+    cmd: "/ns-flow-new-project \"<idea>\"",
+    steps: ["start", "capture", "grill◆", "architect◆", "design?◆", "spec◆", "tickets◆", "[TICKET] (01 walking skeleton)", "[TICKET]×N", "[FEATURE-END]"],
+    notes: ["Every planning station ends with a commit (save, stops for you).", "Ticket 01 is the walking skeleton: the thinnest slice live in production, leaving CI core checks, preview deployments, E2E running locally, on the preview, and as @smoke on production, the project profile, the verification skill proven once, a findable log line, and a rollback tried once. Feature tickets start after it ships.", "Several interlocking unknowns: use the wayfinder line instead of grill."] },
+  { id: "onboard", code: "ON", group: "build", have: "A codebase you do not know yet",
+    when: "Get oriented in an existing codebase, then hand off to the right line.",
+    cmd: "/ns-flow-existing-project \"<goal>\"",
+    steps: ["discover", "doc gaps?", "profile?", "verify? (setup)", "save◆", "quality-check? (setup-ci, E2E)", "route",
+      { goto: [["feature", "new capability"], ["bug", "broken, or live incident"], ["architecture", "decision, migration"], ["restructure", "re-engineering"], ["docs", "docs"], ["ticket", "existing ticket"], ["route", "anything else"]] }],
+    notes: ["Doc gaps use mp:domain-modeling for CONTEXT.md and ADRs, and mp:writing-for-agents for a short CLAUDE.md.", "The project profile holds host, URLs, logs, undo, and E2E facts so later skills read them instead of asking.", "CI running types, lint, tests, and build is recommended before the first code PR; a project with UI also gets the E2E workflow."] },
+  { id: "feature", code: "FE", group: "build", have: "A new capability to add",
+    when: "Add a user-visible or API capability to an existing system.",
+    cmd: "/ns-flow-feature \"<feature>\"",
+    steps: ["branch? (planning docs)", "[PLAN]", "[TICKET]×N (or delegate)", "[FEATURE-END]"],
+    notes: ["One ticket is fine for a small feature.", "Each ticket ships and closes before the next; the release strategy keeps unfinished work hidden."] },
+  { id: "ticket", code: "TK", group: "build", have: "One existing ticket, or one small task",
+    when: "Deliver one ticket, or one small task with no ticket, end to end.",
+    cmd: "/ns-flow-ticket <ticket | \"task\">",
+    steps: ["restate scope?◆ (no ticket)", "[TICKET]"],
+    notes: ["It ends with the ticket closed and the next ticket named from real state, or the feature end once every ticket of the feature has closed."] },
+  { id: "delegate", code: "DG", group: "build", have: "Tickets for an agent to build while you do something else",
+    when: "Hand low or medium risk tickets to agents and get review-ready PRs back, with a review of what each agent decided without you. Requires Herdr.",
+    cmd: "/ns-flow-delegate <ticket> <ticket> ...",
+    steps: ["intake◆", "plan◆", "launch agents (3 at most, one worktree each)", "[TICKET]×N (to a review-ready PR)", "watch and relay", "final review◆ (decided without you)",
+      { fork: [
+        { label: "Merge and ship", steps: ["deploy◆ (release card, one PR at a time)", "verify (production)", "observe", "stakeholder-brief (Shipped)", "close", "[FEATURE-END]? (same feature)", "clean up◆"] },
+        { label: "Or", steps: ["review first", "request changes", "redo another way", "take over", "undo everything◆"] },
+      ] }],
+    notes: ["Low and medium risk only. Planning, high or critical risk, migrations, and incidents are done with you.", "Inside its own worktree an agent edits without per-file approval: the one exception to file-by-file approval. Merging, deploying, secrets, and anything destructive always stop and come to you.", "integration-check matters most here: agents never saw each other's diff."] },
+  { id: "bug", code: "BG", group: "fix", have: "Wrong behavior, not live-broken right now",
+    when: "Reproduce end to end, prove the root cause, then fix test-first.",
+    cmd: "/ns-flow-bugfix \"<bug report>\"",
+    steps: ["discover?", "branch (fix/)", "mp:diagnosing-bugs (reproduce end to end)", "fix plan◆", "spec?◆ (non-trivial)", "scope-check", "implement (mp:tdd, failing test first)", "verify◆ (before and after)", "understand", "review◆", "quality-check◆", "save◆", "pr◆", "rollback?◆ (prepare)", "deploy◆", "verify (production)", "observe", "stakeholder-brief (Shipped)", "close"],
+    notes: ["No fix before evidence of root cause, unless it is trivially obvious.", "The fix ships alone, to production, like any ticket."] },
+  { id: "incident", code: "IN", group: "fix", have: "Production broken, degraded, or exposed right now",
+    when: "Same entrance as bug, in incident mode. Risk is critical and everything after the PR is mandatory.",
+    cmd: "/ns-flow-bugfix \"<incident>\"",
+    steps: ["mitigate first◆", "branch (hotfix/, release ref)", "mp:diagnosing-bugs (reproduce first)", "fix plan◆", "scope-check (smallest fix)", "implement (test-first, regression test kept)", "verify◆ (local)", "understand", "review◆", "quality-check◆ (fast stages)", "save◆", "pr◆ (expedited)", "rollback◆ (prepare)", "deploy◆ (hotfix path)", "verify (production)", "observe (High tier)", "stakeholder-brief (Shipped)", "postmortem◆ (then the lessons card)", "close"],
+    notes: ["The flow asks whether it is live in production and switches mode.", "A rollback or a flag off is offered before any fix is designed. A partial or failed rollback is a new incident.", "postmortem is an internal engineering record; it ends with a lessons card in chat on each decision made under pressure."] },
+  { id: "architecture", code: "AR", group: "structure", have: "An architecture decision",
+    when: "Decide or change architecture. Large restructures go to the re-engineering lines.",
+    cmd: "/ns-flow-architecture \"<question or goal>\"",
+    steps: ["discover (mp:codebase-design)", "grill◆", "architect◆", "ADRs?◆",
+      { fork: [
+        { label: "Decision only", steps: ["docs", "save◆"] },
+        { label: "Code must change", steps: ["spec◆", "tickets◆ (always shippable)", "[TICKET]×N", "[FEATURE-END]"] },
+      ] }],
+    notes: ["ADRs are superseded, never edited."] },
+  { id: "migration", code: "MG", group: "structure", have: "Data, schema, service, or platform moving to a new shape",
+    when: "The architecture line's code path, with mandatory safety stations.",
+    cmd: "/ns-flow-architecture \"<migration>\"",
+    steps: ["discover", "grill◆ (migration risk)", "architect◆ (expand/contract)", "spec◆", "tickets◆ (one step each)", "[TICKET]×N (migration safety in each)", "integration-check (vs plan)"],
+    notes: ["Inside each ticket: the migration-safety stage, a prepared rollback, the full release plan with migration order, and observe at High tier validating the data.", "Destructive data changes add an explicit authorization and a backup and restore plan.", "close confirms the expand/contract cleanup is done or ticketed."] },
+  { id: "wayfinder", code: "WF", group: "structure", have: "A big destination with too many unknowns for one session",
+    when: "Replatform, provider swap, multi-tenancy, new subsystem: clear the unknowns first, across sessions.",
+    cmd: "/ns-flow-wayfinder \"<destination>\"",
+    steps: ["capture?", "wayfinder◆⟲ (one decision per loop)", "ADRs?◆", "architect?◆", "design?◆", "spec◆", "tickets◆", "[TICKET]×N (or delegate)", "[FEATURE-END]"],
+    notes: ["Its self-check falls back to grill if one sitting can settle it.", "For a migration destination, add the migration line's safety steps to each ticket."] },
+  { id: "refactor", code: "RF", group: "structure", have: "A small refactor or tech-debt cleanup",
+    when: "Planned or opportunistic cleanup, behavior unchanged. Larger work is restructure.",
+    cmd: "/ns-route \"<refactor>\"",
+    steps: ["discover? (scoped)", "[TICKET] (description as ticket)"],
+    notes: ["scope-check is the key station: no bundled renames or reorganization.", "Proof: the same flows before and after."] },
+  { id: "restructure", code: "RS", group: "structure", have: "A large restructure inside one stack",
+    when: "Untangle modules, change the data model, or replace a pattern everywhere, with behavior unchanged.",
+    cmd: "/ns-route \"<restructure>\"",
+    steps: ["discover", "verify◆ (baseline)", "grill◆", "architect◆", "tickets◆", "[TICKET]×N", "integration-check"],
+    notes: ["The baseline records what the system does today on its key flows. You confirm the list as what must not change, and every ticket is proven against it."] },
+  { id: "stack-move", code: "SM", group: "structure", have: "A working app moving to a new stack",
+    when: "Move to a new framework, runtime, database, or host, piece by piece, while the app stays live.",
+    cmd: "/ns-route \"<stack move>\"",
+    steps: ["discover", "verify◆ (baseline)", "grill◆", "architect◆ (which seam, which order)", "spec◆", "tickets◆", "[TICKET]×N (old and new side by side)", "integration-check", "remove the old"],
+    notes: ["A flow moves over when the new one matches the baseline. The old path is removed last."] },
+  { id: "rebuild", code: "RB", group: "structure", have: "A new build of a product that already exists",
+    when: "Build a new version using an existing product as the reference for what it must do.",
+    cmd: "/ns-route \"<rebuild>\"",
+    steps: ["verify◆ (baseline of the reference)", "capture", "grill◆", "architect◆", "design?◆", "spec◆", "tickets◆", "[TICKET]×N", "[FEATURE-END]"],
+    notes: ["The baseline is recorded from the reference product and becomes the acceptance criteria."] },
+  { id: "modernize", code: "MD", group: "structure", have: "Old code with few tests to make safe to change",
+    when: "Characterize what legacy code does, add a safety net, then improve it.",
+    cmd: "/ns-route \"<modernize>\"",
+    steps: ["discover", "verify◆ (baseline)", "[TICKET]×N (kept tests where the baseline shows gaps)",
+      { goto: [["restructure", "then improve it"]] }],
+    notes: ["The baseline is the first safety net. Where it shows a flow with no test, a kept test is written before that area is changed."] },
+  { id: "performance", code: "PF", group: "maintain", have: "Correct but too slow or expensive",
+    when: "Profile, find the cause, fix with before and after numbers.",
+    cmd: "/ns-route \"<perf problem>\"",
+    steps: ["discover (scoped)", "mp:diagnosing-bugs | mp:research", "spec?◆ (medium+)", "[TICKET] (benchmark before/after)"],
+    notes: ["mp:diagnosing-bugs for a regression, mp:research for unfamiliar platform behavior. Tests include the load/performance type."] },
+  { id: "dependency", code: "DP", group: "maintain", have: "A package or platform version bump",
+    when: "Add, remove, or bump a dependency, and only that.",
+    cmd: "/ns-route \"<bump>\"",
+    steps: ["[TICKET] (chore/, only this bump)",
+      { fork: [{ label: "Major version, wide blast radius", steps: ["spec◆", "tickets◆", "[TICKET]×N"] }] }],
+    notes: ["The dependencies and secrets stage of quality-check is mandatory."] },
+  { id: "infrastructure", code: "IF", group: "maintain", have: "CI/CD, hosting, IaC, or observability tooling",
+    when: "Change how the system is built, deployed, or watched.",
+    cmd: "/ns-route \"<infra change>\"",
+    steps: ["discover (scoped)", "grill◆ (constraints)", "architect◆ (deployment delta)", "[TICKET] (CI/infra stages)", "mp:wizard◆ (human-only steps)", "deploy◆", "observe"],
+    notes: ["mp:wizard walks you through dashboard and secret steps only a human can do."] },
+  { id: "docs", code: "DC", group: "maintain", have: "Docs out of date",
+    when: "A docs-only change, reviewed and shipped as a PR.",
+    cmd: "/ns-flow-docs [branch | range | all]",
+    steps: ["branch (docs/)", "docs", "review◆ (parts D, F)", "quality-check◆ (format, lint)", "save◆", "pr◆"],
+    notes: ["Missing or stale CONTEXT.md and ADRs go through mp:domain-modeling."] },
+  { id: "spike", code: "SP", group: "explore", have: "A spike: a question to answer, not something to ship",
+    when: "Throwaway: no spec, tickets, tests, or PR.",
+    cmd: "/ns-route \"<question>\"",
+    steps: ["discover?", "grill?◆ (frame the question)", "mp:research | mp:prototype", "findings", "stop or hand off"],
+    notes: ["Prototype code is never merged; close checks for leftovers later."] },
+  { id: "proposal", code: "PP", group: "explore", have: "A plan, estimate, or design requested before committing",
+    when: "Leadership wants a plan before anyone builds. Planning only.",
+    cmd: "/ns-route \"<ask>\"",
+    steps: ["discover?", "capture", "grill◆ | wayfinder◆⟲", "architect?◆", "design?◆", "spec◆", "tickets◆", "save◆", "stop"],
+    notes: ["The brief, architecture, spec, and ticket graph are the deliverable; the graph is the basis for an estimate.", "Once approved, continue with feature from [TICKET], or with migration."] },
+  { id: "pr-review", code: "RV", group: "explore", have: "A teammate's PR to review",
+    when: "Understand and review someone else's change. Read-only.",
+    cmd: "/ns-to-understand <PR base>",
+    steps: ["check out PR", "understand", "review◆ (report only)"],
+    notes: ["Fix nothing; post the findings you pick as PR comments via gh-axi, only with your approval."] },
+  { id: "ship", code: "SH", group: "release", have: "A reviewed PR that needs to ship",
+    when: "Ship a PR that is already review-ready: the end of the ticket block.",
+    cmd: "/ns-route \"ship <PR>\"",
+    steps: ["rollback?◆ (prepare, high risk)", "deploy◆ (release card = the merge)", "verify (production)", "observe", "stakeholder-brief (Shipped)", "close"],
+    notes: [] },
+];
+
+const INFO = {
+  start: { cmd: "/ns-to-start", does: "Bootstrap a brand-new repo: name, README, optional tracker, git init, first commit. CI comes with the walking skeleton.", writes: "README, docs/agents/*, first commit" },
+  capture: { cmd: "/ns-to-capture-idea", does: "Turn a rough idea, notes, or requirements into a concise project brief. Capture only.", writes: "docs/product/project-brief.md" },
+  wayfinder: { cmd: "/ns-to-wayfinder", does: "Clear a decision frontier one decision ticket at a time, across as many sessions as it takes.", writes: "docs/product/wayfinder/*" },
+  grill: { cmd: "/ns-to-grill-me", does: "Settle product and engineering decisions one question at a time, one-way doors first, each with a Learn box.", writes: "CONTEXT.md, ADRs, brief, the decision trail" },
+  discover: { cmd: "/ns-to-discover-codebase", does: "Read-only system map: stack, layout, conventions, key flows, doc gaps.", writes: "docs/architecture/codebase-map.md" },
+  architect: { cmd: "/ns-to-architect", does: "The simplest production-safe architecture, one decision at a time. Design only, no code.", writes: "docs/architecture/{system,data-model,flows}.md" },
+  design: { cmd: "/ns-to-design", does: "A lightweight UI/UX contract: flows, states, accessibility, tokens, ASCII wireframes.", writes: "docs/design/*" },
+  spec: { cmd: "/ns-to-spec", does: "Record settled decisions as one spec sized to the work, with its DECISIONS trail. Invents no behavior.", writes: ".scratch/<slug>/spec.md" },
+  tickets: { cmd: "/ns-to-tickets", does: "Vertical-slice tickets, riskiest first, with undo lines, a release strategy, and parallelism classification.", writes: ".scratch/<slug>/issues/NN-*.md" },
+  "split-ticket": { cmd: "/ns-to-split-ticket", does: "Split one ticket into leaves a human can review in about 15 minutes.", writes: "issues/NN.MM-*.md" },
+  branch: { cmd: "/ns-to-branch", does: "A safe, well-named branch or worktree. Handles dirty trees and stacked bases, never pushes.", writes: "git branch" },
+  "scope-check": { cmd: "/ns-to-scope-check", does: "Fast gate right before implementing: trims scope, names the one fact the change is safe because of and what could still break, lists abuse cases, and puts any real design choice to you with designs side by side. Stops only to trim, flag, or choose.", writes: "the ticket's Decisions section" },
+  implement: { cmd: "/ns-to-implement", does: "One vertical slice, test-first, with a verification plan that names every kept test: an E2E test per user-facing criterion, an integration test per rule with no screen. Escalates instead of silently redesigning.", writes: "code and kept tests" },
+  understand: { cmd: "/ns-to-understand", does: "An implementation brief and a 5-minute review path, so the change is understood, not just accepted.", writes: "nothing" },
+  review: { cmd: "/ns-to-review", does: "Thirteen-part review (spec, bugs, security, standards, performance, simplicity, and more), reviewers scaled by risk. Each finding has a file:line, a failure scenario, and a fix; ends Approve, Approve with nits, or Request changes.", writes: "nothing (findings)" },
+  "quality-check": { cmd: "/ns-to-quality-check", does: "Shows every stage with a recommendation, you confirm once, then stages run one at a time; the last gate before commit. Makes sure CI enforces types, lint, tests, and build.", writes: ".github/workflows/quality.yml (when CI lacks a core check)" },
+  "integration-check": { cmd: "/ns-to-integration-check", does: "Verify the assembled feature against the spec once every ticket has closed: composed flows on the base branch and on production, the seams between tickets, and regressions between them.", writes: "nothing (findings)" },
+  "stakeholder-brief": { cmd: "/ns-to-stakeholder-brief [review | release]", does: "The plain-language reports every PR carries for designers, product, and stakeholders: the stakeholder review when the PR is ready, and the Shipped comment after production is healthy.", writes: "two PR comments, optional page" },
+  postmortem: { cmd: "/ns-to-postmortem", does: "Blameless incident record for engineering and leadership, then a lessons card for you: each decision made under pressure, its principle, and what hindsight says.", writes: "docs/incidents/NNNN-*.md" },
+  save: { cmd: "/ns-to-save", does: "Conventional commit of local work. Never pushes.", writes: "commit" },
+  pr: { cmd: "/ns-to-pr", does: "Push and open the PR after your approval, which also approves its report set. Adds the version bump commit, posts the local proof and evidence page, reads CI, runs the preview check, writes the review-ready description, and posts the stakeholder review. Never merges.", writes: "pull request, its reports, the version bump commit" },
+  rollback: { cmd: "/ns-to-rollback", does: "Prepare a timed rollback plan (target: under a minute, mechanical) before a risky deploy, or execute it when production is unhealthy, then revert the PR and reopen the ticket.", writes: "rollback plan" },
+  deploy: { cmd: "/ns-to-deploy", does: "Preflight, then one release card with CI, the preview check, the score, the risk, and the undo. Your answer on it is the merge. Then it confirms production is on the merged commit. Also sets up optional versioning.", writes: "release, version tag" },
+  observe: { cmd: "/ns-to-observe", does: "Reads the real production logs first, then the risk tier's checks, ending HEALTHY or UNHEALTHY. When it is not healthy it asks how to stop the harm first.", writes: "nothing (verdict)" },
+  docs: { cmd: "/ns-to-docs", does: "Bring docs, READMEs, CONTEXT.md, ADRs, and the verification skill's feature map in line with the code, searching the whole codebase for old names.", writes: "docs" },
+  verify: { cmd: "/ns-to-verify [local | preview | production | baseline | setup]", does: "Full proof on local: every criterion walked on a real screen or request, mobile and desktop screenshots, a clip, console and requests, Lighthouse against the base, the E2E suite, and a score out of 100. A smoke check on preview and production that also reads the E2E run in CI. Asks first: watched, hidden, manual, or skip. Also records a baseline before re-engineering and sets up the project verification skill.", writes: "kept tests, .verification/<branch>/*, verify-<app> skill (setup)" },
+  close: { cmd: "/ns-to-close", does: "Verify every loose end, including the PR's reports, then close the ticket with its closing entry, clear local evidence, and name the next ticket from real state. Ends CLOSED or NOT CLOSED. Offers \"announce it\".", writes: "ticket status and closing entry" },
+  "mp:diagnosing-bugs": { cmd: "mattpocock-skills:diagnosing-bugs", does: "Reproduce end to end, then find the root cause. No fix before evidence.", writes: "reproduction and regression evidence", kind: "other" },
+  "mp:research": { cmd: "mattpocock-skills:research", does: "Primary-source research captured as a Markdown file.", writes: "research notes", kind: "other" },
+  "mp:prototype": { cmd: "mattpocock-skills:prototype", does: "A throwaway prototype that answers one design question.", writes: "throwaway code", kind: "other" },
+  "mp:wizard": { cmd: "mattpocock-skills:wizard", does: "An interactive script that walks you through steps only a human can do: dashboards, secrets.", writes: "wizard script", kind: "other" },
+  ADRs: { cmd: "mattpocock-skills:domain-modeling", does: "Record costly-to-reverse decisions as ADRs. Accepted ADRs are superseded, never edited.", writes: "docs/adr/NNNN-*.md", kind: "other" },
+  "doc gaps": { cmd: "/ns-flow-existing-project", does: "Fill missing CONTEXT.md, ADRs, tracker docs, and CLAUDE.md, grounded in the code.", kind: "step" },
+  profile: { cmd: "/ns-flow-existing-project", does: "Write docs/agents/workflow.md: whether there is UI, the host, URLs, how deploys happen, logs, the fastest undo, flags, and the E2E setup.", kind: "step" },
+  "remove the old": { cmd: "/ns-route", does: "The last ticket of a stack move: delete the old path once every flow matches the baseline on the new one.", kind: "step" },
+  route: { cmd: "/ns-flow-existing-project", does: "Ask what you want to do and hand off to the matching line.", kind: "step" },
+  "fix plan": { cmd: "/ns-flow-bugfix", does: "State the root cause and the smallest fix. You approve it before any code is written.", kind: "step" },
+  "mitigate first": { cmd: "/ns-to-observe", does: "A decision that asks how to stop the harm before how to fix it: instant rollback, flag off, fix forward, or investigate, with the time each takes and what it leaves.", kind: "step" },
+  "flag on": { cmd: "/ns-to-deploy", does: "Turn the feature flag on for everyone once the integration check passes, then observe. Its own stop.", kind: "step" },
+  "restate scope": { cmd: "/ns-flow-ticket", does: "For a task with no ticket: restate scope, out of scope, and acceptance criteria for your approval.", kind: "step" },
+  intake: { cmd: "/ns-flow-delegate", does: "Check each ticket's risk, settle everything an agent would otherwise guess, and split anything too large, before launch.", kind: "step" },
+  plan: { cmd: "/ns-flow-delegate", does: "Blockers, file overlap, branch names, what runs now and what waits. You approve the plan.", kind: "step" },
+  "launch agents": { cmd: "/ns-flow-delegate", does: "One Herdr worktree and agent per ticket, edits auto-accepted, destructive commands denied. Three at once at most.", kind: "step" },
+  "watch and relay": { cmd: "/ns-flow-delegate", does: "Status in plain English. When an agent stops, the captain explains why and asks you. It never answers for you.", kind: "step" },
+  "final review": { cmd: "/ns-flow-delegate", does: "One card per PR: preview, score, and a table of what the agent decided without you. Walk through or challenge any decision, then choose what happens to the PR.", kind: "step" },
+  "review first": { cmd: "/ns-flow-delegate", does: "Stop with the PR open. Run the command again later to pick up here.", kind: "step" },
+  "request changes": { cmd: "/ns-flow-delegate", does: "Say what to change; the same agent applies it and proves it again.", kind: "step" },
+  "redo another way": { cmd: "/ns-flow-delegate", does: "A new agent builds the design the first one rejected, so the two PRs can be compared.", kind: "step" },
+  "take over": { cmd: "/ns-flow-delegate", does: "Stop the agent and open the worktree for you to finish by hand.", kind: "step" },
+  "undo everything": { cmd: "/ns-flow-delegate", does: "Close the PR and remove the branch and worktree, after a second confirmation listing exactly what goes.", kind: "step" },
+  "clean up": { cmd: "/ns-flow-delegate", does: "Remove the worktrees and branches this run created, after checking for unpushed work.", kind: "step" },
+  findings: { cmd: "/ns-route", does: "Answer the spike's question with evidence. Prototype code is thrown away.", kind: "step" },
+  stop: { cmd: "/ns-route", does: "Planning ends here; the documents are the deliverable.", kind: "step" },
+  "stop or hand off": { cmd: "/ns-route", does: "Stop, or continue into the feature, architecture, or proposal line.", kind: "step" },
+  "check out PR": { cmd: "gh pr checkout <n>", does: "Check out the teammate's PR on a clean working tree.", kind: "step" },
+};
+
+const OTHER_SKILLS = [
+  ["mattpocock-skills:grilling", "Questioning discipline behind grill and wayfinder."],
+  ["mattpocock-skills:domain-modeling", "CONTEXT.md glossary and ADR upkeep."],
+  ["mattpocock-skills:diagnosing-bugs", "Reproduce and root-cause in bug, incident, performance."],
+  ["mattpocock-skills:tdd", "Test-first inside implement, which writes every kept test."],
+  ["mattpocock-skills:prototype", "Throwaway answers in spike, architecture, design, wayfinder."],
+  ["mattpocock-skills:research", "Primary-source facts in spike, performance, architecture."],
+  ["mattpocock-skills:codebase-design", "Deep-module and seam vocabulary for architect."],
+  ["mattpocock-skills:code-review", "Fresh-context standards and spec review inside review."],
+  ["mattpocock-skills:wizard", "Human-only steps in infrastructure, deploy, setup-ci."],
+  ["mattpocock-skills:resolving-merge-conflicts", "Conflicts in branch, pr, and delegate merges."],
+  ["mattpocock-skills:writing-for-agents", "CLAUDE.md, AGENTS.md, and skill edits in onboard and docs."],
+  ["/setup-matt-pocock-skills", "Tracker and domain docs setup in start and onboard."],
+  ["security-review", "Mandatory gate before quality-check for security-sensitive work."],
+  ["gh-axi", "Tracker, PRs, and CI status."],
+  ["playwright-cli", "Drives the browser in verify: walks, screenshots, clips."],
+  ["chrome-devtools-axi", "Console, network, and the accessibility audit in verify."],
+  ["lighthouse", "Performance and web vitals on every touched page, against the base."],
+  ["ffmpeg", "Turns a recorded clip into an .mp4 that plays everywhere."],
+  ["herdr", "Worktrees and agents for the delegate line."],
+];
+const NOT_USED = [
+  ["no-mistakes", "Its pipeline applies fixes and pushes on its own, which breaks file-by-file approval. Run it separately if you want it."],
+  ["code-review", "The built-in top-level skill, not mattpocock-skills:code-review. Its --fix applies findings to the working tree, which breaks file-by-file approval. Use /ns-to-review inside a flow."],
+  ["simplify", "Applies its fixes directly by default, same conflict as code-review --fix. Use /ns-to-scope-check or /ns-to-review's part F (simplicity) inside a flow."],
+  ["ns-to-test (retired)", "Folded into implement: the kept-tests topic sets which tests every ticket keeps."],
+  ["ns-flow-parallel (retired)", "Replaced by /ns-flow-delegate, the \"hand to an agent\" mode."],
+  ["lavish", "General HTML rendering tool, not a workflow station."],
+  ["find-skills", "Discovers new skills, not a workflow station."],
+];
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const WF = Object.fromEntries(WORKFLOWS.map(w => [w.id, w]));
+
+function parse(tok) {
+  if (typeof tok !== "string") return tok;
+  if (tok.includes(" | ")) return { alt: tok.split(" | ").map(parse) };
+  let note = "";
+  const m = tok.match(/^(.*?)\s*\((.*)\)\s*$/);
+  if (m) { tok = m[1]; note = m[2]; }
+  const s = { gate: tok.includes("◆"), opt: tok.includes("?"), mult: tok.includes("×N"), loop: tok.includes("⟲"), note };
+  const name = tok.replace(/[◆?⟲]|×N/g, "").trim();
+  if (name.startsWith("[")) s.block = name.slice(1, -1); else s.key = name;
+  return s;
+}
+
+function marker(s) {
+  if (s.block) return `<span class="pill">${esc(s.block)}</span>`;
+  return s.gate ? `<span class="diamond"></span>` : `<span class="dot"></span>`;
+}
+function label(s) {
+  if (s.block) return `<button class="lbl" type="button" data-block="${esc(s.block)}">${esc(s.block.toLowerCase())} block</button>`;
+  return `<button class="lbl" type="button" data-key="${esc(s.key)}">${esc(s.key)}</button>`;
+}
+
+function stopHTML(tok, color) {
+  const s = parse(tok);
+  if (s.alt) {
+    const gate = s.alt.some(a => a.gate);
+    const lbls = s.alt.map(label).join(`<span class="or">or</span>`);
+    const badges = s.alt.some(a => a.loop) ? `<div class="badges"><span class="badge">⟲</span></div>` : "";
+    return `<div class="stop wide" style="--c:${color}"><span class="track">${gate ? `<span class="diamond"></span>` : `<span class="dot"></span>`}</span><div class="lbls">${lbls}</div>${badges}</div>`;
+  }
+  const info = s.key && INFO[s.key];
+  const cls = ["stop", s.opt ? "opt" : "", info && info.kind === "step" ? "pseudo" : "", (s.note && s.note.length > 18) || (s.key && s.key.length > 14) ? "wide" : ""].filter(Boolean).join(" ");
+  const col = s.block ? GROUPS[BLOCKS[s.block].group].color : color;
+  const badges = [s.mult ? "×N" : "", s.loop ? "⟲" : ""].filter(Boolean).map(b => `<span class="badge">${b}</span>`).join("");
+  return `<div class="${cls}" style="--c:${col}"><span class="track">${marker(s)}</span><div class="lbls">${label(s)}</div>${badges ? `<div class="badges">${badges}</div>` : ""}${s.note ? `<div class="note">${esc(s.note)}</div>` : ""}</div>`;
+}
+
+function bulletHTML(w) {
+  return `<span class="bullet" style="--c:${GROUPS[w.group].color}" aria-hidden="true">${esc(w.code)}</span>`;
+}
+function gotoHTML(id, text) {
+  if (id === "route") return `<a class="goto" href="#find"><span class="bullet" style="--c:var(--muted)" aria-hidden="true">?</span>${esc(text)}: /ns-route</a>`;
+  const w = WF[id];
+  return `<a class="goto" href="#${id}">${bulletHTML(w)}${esc(text)}: ${esc(id)}</a>`;
+}
+
+function lineHTML(steps, color) {
+  let html = "", run = [];
+  const flush = () => { if (run.length) { html += `<div class="line">${run.map(t => stopHTML(t, color)).join("")}</div>`; run = []; } };
+  for (const t of steps) {
+    if (typeof t === "string") { run.push(t); continue; }
+    flush();
+    if (t.fork) html += `<div class="fork">${t.fork.map(b => `<div class="branch"><div class="blabel">${esc(b.label)}</div>${lineHTML(b.steps, color)}</div>`).join("")}</div>`;
+    if (t.goto) html += `<div class="fork"><div class="branch"><div class="blabel">Hands off to</div><div class="gotos">${t.goto.map(([id, text]) => gotoHTML(id, text)).join("")}</div></div></div>`;
+  }
+  flush();
+  return html;
+}
+
+function cmdHTML(cmd, auto) {
+  return `<div class="run"><span class="cmd"><span>${esc(cmd)}</span><button class="copy" type="button" data-copy="${esc(cmd)}">Copy</button></span>${auto ? `<span class="auto">add --auto for autopilot</span>` : ""}</div>`;
+}
+
+// Finder
+$("#finder").innerHTML = WORKFLOWS.map(w => `<a class="find" href="#${w.id}">${bulletHTML(w)}<span class="have">${esc(w.have)}</span><span class="to">${esc(w.id)}</span></a>`).join("")
+  + `<a class="find" href="#run"><span class="bullet" style="--c:var(--muted)" aria-hidden="true">?</span><span class="have">Anything else, or unsure</span><span class="to">/ns-route</span></a>`;
+
+// Blocks
+$("#blockList").innerHTML = Object.entries(BLOCKS).map(([k, b]) => {
+  const color = GROUPS[b.group].color;
+  return `<article class="card" id="block-${k.toLowerCase()}">
+    <div class="card-head"><span class="bullet" style="--c:${color}" aria-hidden="true">${k[0]}</span><div class="title"><span class="group">Shared block</span><h3>${esc(b.title)}</h3></div></div>
+    ${b.cmd ? cmdHTML(b.cmd, true) : ""}
+    ${lineHTML(b.steps, color)}
+    ${b.loop ? `<div class="loopnote"><span class="badge">loop</span><span>${esc(b.loop)}</span></div>` : ""}
+    ${b.notes.length ? `<ul class="notes">${b.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+  </article>`;
+}).join("");
+
+// Cards
+function cardHTML(w) {
+  const color = GROUPS[w.group].color;
+  const auto = /^\/ns-(flow|route)/.test(w.cmd);
+  return `<article class="card" id="${w.id}" data-group="${w.group}">
+    <div class="card-head">${bulletHTML(w)}<div class="title"><span class="group">${esc(GROUPS[w.group].label)}</span><h3>${esc(w.id)}</h3></div></div>
+    <p class="when">${esc(w.when)}</p>
+    ${cmdHTML(w.cmd, auto)}
+    ${lineHTML(w.steps, color)}
+    ${w.notes.length ? `<ul class="notes">${w.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+  </article>`;
+}
+$("#cards").innerHTML = WORKFLOWS.map(cardHTML).join("") + `<p class="empty" id="empty" hidden>No workflow matches. Try another word, or run /ns-route.</p>`;
+
+// Toolbar: group filter and search
+let groupFilter = "all";
+try { groupFilter = localStorage.getItem("srm-group") || "all"; } catch (e) {}
+$("#toolbar").innerHTML = `<button class="chip" type="button" data-group="all" aria-pressed="false">All</button>`
+  + Object.entries(GROUPS).map(([k, g]) => `<button class="chip" type="button" data-group="${k}" aria-pressed="false" style="--c:${g.color}"><i></i>${esc(g.label)}</button>`).join("")
+  + `<input class="search" id="search" type="search" placeholder="Search workflows or skills" aria-label="Search workflows or skills">`;
+
+function flat(steps, out = []) {
+  for (const t of steps) {
+    if (typeof t === "string") { const s = parse(t); (s.alt || [s]).forEach(x => out.push(x)); }
+    else if (t.fork) t.fork.forEach(b => flat(b.steps, out));
+  }
+  return out;
+}
+function applyFilter() {
+  const q = $("#search").value.trim().toLowerCase();
+  let shown = 0;
+  for (const w of WORKFLOWS) {
+    const hay = [w.id, w.have, w.when, w.cmd, ...flat(w.steps).map(s => s.key || s.block || "")].join(" ").toLowerCase();
+    const ok = (groupFilter === "all" || w.group === groupFilter) && (!q || hay.includes(q));
+    document.getElementById(w.id).hidden = !ok;
+    if (ok) shown++;
+  }
+  $("#empty").hidden = shown > 0;
+  document.querySelectorAll("#toolbar .chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.group === groupFilter)));
+}
+$("#toolbar").addEventListener("click", e => {
+  const c = e.target.closest(".chip");
+  if (!c) return;
+  groupFilter = c.dataset.group;
+  try { localStorage.setItem("srm-group", groupFilter); } catch (err) {}
+  applyFilter();
+});
+$("#search").addEventListener("input", applyFilter);
+if (!GROUPS[groupFilter]) groupFilter = "all";
+applyFilter();
+
+// Inventory
+function usedIn(key) {
+  const hits = [];
+  for (const w of WORKFLOWS) if (flat(w.steps).some(s => s.key === key)) hits.push(w.id);
+  for (const [k, b] of Object.entries(BLOCKS)) if (flat(b.steps).some(s => s.key === key)) hits.push("block:" + k);
+  return hits;
+}
+const phaseKeys = Object.keys(INFO).filter(k => !INFO[k].kind);
+$("#invPhases").innerHTML = phaseKeys.map(k => `<button type="button" data-key="${esc(k)}"><span class="n">${esc(INFO[k].cmd)}</span><span class="d">${esc(INFO[k].does)}</span></button>`).join("");
+$("#invOther").innerHTML = OTHER_SKILLS.map(([n, d]) => `<button type="button" data-ext="${esc(n)}"><span class="n">${esc(n)}</span><span class="d">${esc(d)}</span></button>`).join("");
+$("#invNot").innerHTML = NOT_USED.map(([n, d]) => `<button type="button" data-ext="${esc(n)}"><span class="n">${esc(n)}</span><span class="d">${esc(d)}</span></button>`).join("");
+
+// Drawer
+const drawer = $("#drawer");
+function openDrawer(title, rows) {
+  $("#dTitle").textContent = title;
+  $("#dBody").innerHTML = rows.filter(r => r[1]).map(([t, v]) => `<div><dt>${esc(t)}</dt><dd>${v}</dd></div>`).join("");
+  drawer.hidden = false;
+}
+function showKey(key) {
+  const i = INFO[key];
+  if (!i) return;
+  const hits = usedIn(key);
+  const chips = hits.map(h => h.startsWith("block:")
+    ? `<a class="goto" href="#block-${h.slice(6).toLowerCase()}"><span class="bullet" style="--c:${GROUPS[BLOCKS[h.slice(6)].group].color}" aria-hidden="true">${h[6]}</span>[${esc(h.slice(6))}] block</a>`
+    : `<a class="goto" href="#${h}">${bulletHTML(WF[h])}${esc(h)}</a>`).join("");
+  openDrawer(key, [
+    ["Run", `<span class="cmd"><span>${esc(i.cmd)}</span></span>`],
+    ["What it does", esc(i.does)],
+    ["Writes", i.writes ? `<code>${esc(i.writes)}</code>` : ""],
+    ["Stations on these lines", hits.length ? `<div class="gotos">${chips}</div>` : "Used inside other skills rather than as its own station."],
+  ]);
+}
+document.addEventListener("click", e => {
+  const lb = e.target.closest("[data-key]");
+  if (lb) { showKey(lb.dataset.key); return; }
+  const bb = e.target.closest("[data-block]");
+  if (bb) { document.getElementById("block-" + bb.dataset.block.toLowerCase()).scrollIntoView(); return; }
+  const ex = e.target.closest("[data-ext]");
+  if (ex) {
+    const n = ex.dataset.ext;
+    const d = (OTHER_SKILLS.find(o => o[0] === n) || NOT_USED.find(o => o[0] === n))[1];
+    openDrawer(n, [["Role", esc(d)]]);
+    return;
+  }
+  const cp = e.target.closest("[data-copy]");
+  if (cp) {
+    const text = cp.dataset.copy;
+    const done = () => { cp.textContent = "Copied"; setTimeout(() => { cp.textContent = "Copy"; }, 1400); };
+    const fallback = () => {
+      const span = cp.previousElementSibling, r = document.createRange();
+      r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      cp.textContent = "Selected";
+    };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+  }
+});
+$("#dClose").addEventListener("click", () => { drawer.hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") drawer.hidden = true; });
+
+$("#synced").textContent = `Map data last synced with the workflows folder on ${SYNCED}.`;
+</script>

@@ -1,0 +1,1 @@
+{ "name": "fixture", "owner": { "name": "fixture" }, "plugins": [ { "name": "ns-skills", "source": "./" } ] }

@@ -1,0 +1,1007 @@
+#!/usr/bin/env python3
+"""ns - live view and token usage for the ns-* skills.
+
+Reads Claude Code session transcripts (~/.claude/projects/<project>/<session>.jsonl and its
+subagents/ folder). A skill run starts when the transcript shows a read of
+.../skills/ns-*/SKILL.md in any install location (the user skills folder, a project, or a plugin
+cache), or a typed /ns-* command (also as /<plugin>:ns-*), and lasts until the next one. Every
+model call between two such points belongs to that run. Nothing is written to the skills or to
+the transcripts, and the skills spend no tokens for this.
+
+Weighted tokens put every kind of token on one scale, in "plain input token" units, using the
+price ratios that hold across Claude models: input 1x, cache write 1.25x (5 minute) or 2x
+(1 hour), cache read 0.1x, output 5x. It ranks where the money goes; it is not a bill.
+"""
+import argparse
+import collections
+import datetime as dt
+import glob
+import json
+import os
+import re
+import shutil
+import statistics
+import sys
+import tempfile
+import time
+
+HOME = os.path.expanduser("~")
+PROJECTS = os.environ.get("NS_PROJECTS_DIR") or os.path.join(HOME, ".claude", "projects")
+# where the skills live: the folder this script is installed in (skills/ns-route/scripts/ns), then the usual user folders
+HERE_SKILLS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+SKILL_DIRS = [d for d in dict.fromkeys(
+    [HERE_SKILLS, os.path.join(HOME, ".claude", "skills"), os.path.join(HOME, ".agents", "skills")]
+    + sorted(glob.glob(os.path.join(HOME, ".claude", "plugins", "cache", "*", "*", "*", "skills")))
+    + sorted(glob.glob(os.path.join(HOME, ".claude", "plugins", "marketplaces", "*", "skills")))) if os.path.isdir(d)]
+AWAY = 15 * 60  # a gap longer than this between two events is the user being away
+W_INP, W_CW5, W_CW1, W_CR, W_OUT = 1.0, 1.25, 2.0, 0.1, 5.0
+
+SKILL_RE = re.compile(r"/skills/(ns-[a-z0-9-]+)/SKILL\.md$")
+# the first two alternatives keep older sessions (the previous layout) readable
+SHARED_RE = re.compile(r"/skills/(?:[A-Z]+\.md|ns-shared/[^/]+\.md|ns-[a-z0-9-]+/(?:references|workflows)/(?:[^/]+/)?[^/]+)$")
+CMD_RE = re.compile(r"<command-name>/?(?:[a-z0-9-]+:)?(ns-[a-z0-9-]+)</command-name>")
+
+# ---------------------------------------------------------------- style
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+class Style:
+    on = False
+
+
+def sgr(code, s):
+    return "\x1b[%sm%s\x1b[0m" % (code, s) if Style.on else s
+
+
+def bold(s): return sgr("1", s)
+def dim(s): return sgr("2", s)
+def ital(s): return sgr("3", s)
+def head(s): return sgr("1;38;2;94;204;170", s)
+def warn(s): return sgr("38;2;232;178;90", s)
+def good(s): return sgr("38;2;120;200;120", s)
+def bad(s): return sgr("38;2;230;110;110", s)
+def rgb(c, s): return sgr("38;2;%d;%d;%d" % c, s)
+
+
+def vlen(s): return len(ANSI_RE.sub("", s))
+def pad(s, w, right=False):
+    gap = max(0, w - vlen(s))
+    return " " * gap + s if right else s + " " * gap
+
+
+def lerp(a, b, t): return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+GREEN, BLUE = (140, 210, 90), (88, 150, 235)
+def ramp(i, n): return lerp(GREEN, BLUE, 0 if n <= 1 else i / (n - 1))
+
+
+def term_width():
+    return max(72, min(shutil.get_terminal_size((100, 30)).columns, 140))
+
+
+# ---------------------------------------------------------------- formatting
+
+def tok(n):
+    n = float(n)
+    if n >= 1e6: return "%.1fM" % (n / 1e6)
+    if n >= 1e4: return "%.0fk" % (n / 1e3)
+    if n >= 1e3: return "%.1fk" % (n / 1e3)
+    return "%d" % n
+
+
+def dur(sec):
+    sec = int(sec)
+    if sec < 60: return "%ds" % sec
+    if sec < 3600: return "%dm%02ds" % (sec // 60, sec % 60)
+    return "%dh%02dm" % (sec // 3600, sec % 3600 // 60)
+
+
+def local(ts): return ts.astimezone()
+def clock(ts): return local(ts).strftime("%H:%M:%S")
+def stamp(ts): return local(ts).strftime("%a %d %b %H:%M")
+
+
+BLOCKS = " ▏▎▍▌▋▊▉█"
+SPARK = "▁▂▃▄▅▆▇█"
+
+
+def bar(v, vmax, width, color):
+    if vmax <= 0 or v <= 0: return " " * width
+    eighths = int(round(min(1.0, v / vmax) * width * 8))
+    full, part = divmod(eighths, 8)
+    s = "█" * full + (BLOCKS[part] if part else "")
+    return rgb(color, s) + " " * (width - vlen(s))
+
+
+def spark(values, vmax=None):
+    vmax = vmax or max(values or [0]) or 1
+    return [SPARK[min(7, int(v / vmax * 7.999))] if v > 0 else " " for v in values]
+
+
+def wrap(s, width, first="  · ", rest="    "):
+    """Word-wrap by visible width. Styled spans in notes never contain spaces, so words stay whole."""
+    lines, cur = [], first
+    for w in s.split(" "):
+        if vlen(cur) + vlen(w) + 1 > width and vlen(cur.strip()) > 0 and cur not in (first, rest):
+            lines.append(cur.rstrip())
+            cur = rest
+        cur += ("" if cur in (first, rest) else " ") + w
+    return lines + [cur]
+
+
+def trim(s, n): return s if len(s) <= n else s[:n - 1] + "…"
+def mark_char(i): return "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 61]
+
+
+def table(cols, rows):
+    """cols: list of (header, align) where align is 'l' or 'r'. Rows are lists of strings."""
+    widths = [max([vlen(h)] + [vlen(r[i]) for r in rows]) for i, (h, _) in enumerate(cols)]
+    out = ["  " + "  ".join(pad(dim(h), widths[i], a == "r") for i, (h, a) in enumerate(cols))]
+    for r in rows:
+        out.append("  " + "  ".join(pad(r[i], widths[i], cols[i][1] == "r") for i in range(len(cols))))
+    return out, widths
+
+
+# ---------------------------------------------------------------- transcript model
+
+class Call:
+    """One model call. A message is written to the transcript once per content block, so a
+    call is keyed by message id and its usage is counted once."""
+    def __init__(self, mid, ts, sub):
+        self.id, self.ts, self.sub = mid, ts, sub
+        self.inp = self.cw5 = self.cw1 = self.cr = self.out = 0
+        self.tools, self.tool_ids, self.skill, self.model = [], set(), None, None
+
+    @property
+    def prompt(self): return self.inp + self.cw5 + self.cw1 + self.cr
+    @property
+    def new(self): return self.inp + self.cw5 + self.cw1
+    @property
+    def eq(self): return self.inp * W_INP + self.cw5 * W_CW5 + self.cw1 * W_CW1 + self.cr * W_CR + self.out * W_OUT
+
+
+def parse_ts(s): return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+class Reader:
+    """Incremental reader for one session: its main transcript and its subagent transcripts."""
+    def __init__(self, path):
+        self.path = path
+        self.id = os.path.basename(path)[:-6]
+        self.project = os.path.basename(os.path.dirname(path))
+        self.calls, self.marks, self.reads = {}, [], collections.Counter()
+        self.offsets = {}
+        self.title = None
+
+    def files(self):
+        sub = sorted(glob.glob(os.path.join(os.path.dirname(self.path), self.id, "subagents", "*.jsonl")))
+        return [(self.path, False)] + [(p, True) for p in sub]
+
+    def refresh(self):
+        for path, sub in self.files():
+            try:
+                with open(path, "rb") as f:
+                    f.seek(self.offsets.get(path, 0))
+                    data = f.read()
+            except OSError:
+                continue
+            end = data.rfind(b"\n") + 1  # leave a half-written last line for the next refresh
+            self.offsets[path] = self.offsets.get(path, 0) + end
+            for line in data[:end].decode("utf-8", "replace").splitlines():
+                self._line(line, sub)
+        return self
+
+    def _line(self, line, sub):
+        if '"assistant"' not in line and "command-name" not in line and '"ai-title"' not in line:
+            return
+        try:
+            o = json.loads(line)
+        except ValueError:
+            return
+        t = o.get("type")
+        if t == "assistant":
+            self._assistant(o, sub or bool(o.get("isSidechain")))
+        elif t == "user":
+            c = (o.get("message") or {}).get("content")
+            text = c if isinstance(c, str) else " ".join(b.get("text", "") for b in c or [] if isinstance(b, dict))
+            m = CMD_RE.search(text)
+            if m and not sub:
+                self.marks.append((parse_ts(o["timestamp"]), m.group(1)))
+        elif t == "ai-title":
+            self.title = o.get("aiTitle") or o.get("title") or self.title
+
+    def _assistant(self, o, sub):
+        m, u = o.get("message") or {}, (o.get("message") or {}).get("usage")
+        if not u or not o.get("timestamp"):
+            return
+        mid = m.get("id") or o.get("uuid")
+        c = self.calls.get(mid)
+        if c is None:
+            c = self.calls[mid] = Call(mid, parse_ts(o["timestamp"]), sub)
+        cc = u.get("cache_creation") or {}
+        total_cw = u.get("cache_creation_input_tokens", 0) or 0
+        c.inp, c.cr, c.out = u.get("input_tokens", 0) or 0, u.get("cache_read_input_tokens", 0) or 0, u.get("output_tokens", 0) or 0
+        c.cw1 = cc.get("ephemeral_1h_input_tokens", 0) or 0
+        c.cw5 = (cc.get("ephemeral_5m_input_tokens", 0) or 0) if cc else total_cw
+        c.skill, c.model = o.get("attributionSkill"), m.get("model")
+        for b in m.get("content") or []:
+            if not isinstance(b, dict) or b.get("type") != "tool_use" or b.get("id") in c.tool_ids:
+                continue
+            c.tool_ids.add(b.get("id"))
+            name, inp = b.get("name", "?"), b.get("input") or {}
+            path = inp.get("file_path") or ""
+            c.tools.append("%s %s" % (name, os.path.basename(path)) if path else name)
+            if name == "Read" and not sub:
+                if SKILL_RE.search(path):
+                    self.marks.append((c.ts, SKILL_RE.search(path).group(1)))
+                elif SHARED_RE.search(path):
+                    self.reads[path] += 1
+
+    # -- views
+    def sorted_calls(self):
+        return sorted((c for c in self.calls.values() if c.prompt or c.out), key=lambda c: c.ts)
+
+    def active_seconds(self):
+        ts = sorted([c.ts for c in self.calls.values()] + [m[0] for m in self.marks])
+        return sum(g for g in ((b - a).total_seconds() for a, b in zip(ts, ts[1:])) if g <= AWAY)
+
+    def has_runs(self): return bool(self.marks)
+
+
+class Seg:
+    """One run of one skill: the calls between its marker and the next marker."""
+    def __init__(self, label, start):
+        self.label, self.start, self.calls, self.end, self.n, self.run = label, start, [], start, 0, 1
+        self.handoff = None  # when the next run started
+
+    def add(self, c):
+        self.calls.append(c)
+        self.end = max(self.end, c.ts)
+
+    main = property(lambda s: [c for c in s.calls if not c.sub])
+    sub = property(lambda s: [c for c in s.calls if c.sub])
+    eq = property(lambda s: sum(c.eq for c in s.calls))
+    out = property(lambda s: sum(c.out for c in s.calls))
+    new = property(lambda s: sum(c.new for c in s.calls))
+    cr = property(lambda s: sum(c.cr for c in s.calls))
+    peak = property(lambda s: max([c.prompt for c in s.main] or [0]))
+    last_ctx = property(lambda s: (s.main[-1].prompt if s.main else 0))
+
+    def active(self):
+        ts = sorted([self.start] + [c.ts for c in self.calls] + ([self.handoff] if self.handoff else []))
+        return sum(g for g in ((b - a).total_seconds() for a, b in zip(ts, ts[1:])) if g <= AWAY)
+
+    @property
+    def name(self):
+        return self.label + (" ↻%d" % self.run if self.run > 1 else "")
+
+
+def segments(rd):
+    marks = []
+    for ts, name in sorted(rd.marks):
+        if not marks or marks[-1][1] != name:  # a re-read of the same skill is the same run
+            marks.append((ts, name))
+    segs, mi, last = [], -1, None
+    for c in rd.sorted_calls():
+        while mi + 1 < len(marks) and marks[mi + 1][0] <= c.ts:
+            mi += 1
+        if last is None or last[0] != mi:
+            seg = Seg(marks[mi][1] if mi >= 0 else "(before any skill)", marks[mi][0] if mi >= 0 else c.ts)
+            segs.append(seg)
+            last = (mi, seg)
+        last[1].add(c)
+    seen = collections.Counter()
+    for i, s in enumerate(segs):
+        s.handoff = segs[i + 1].start if i + 1 < len(segs) else None
+        s.n = i + 1
+        seen[s.label] += 1
+        s.run = seen[s.label]
+    return segs
+
+
+# ---------------------------------------------------------------- finding sessions
+
+def project_dir_for(cwd):
+    return os.path.join(PROJECTS, re.sub(r"[^A-Za-z0-9]", "-", cwd))
+
+
+RUN_BYTES = re.compile(rb'"file_path":"[^"]*/skills/ns-[a-z0-9-]+/SKILL\.md"|"content":"<command-message>(?:[a-z0-9-]+:)?ns-')
+
+
+def has_ns(path):
+    """Cheap check for a real skill run: a read of a skill's SKILL.md, or a typed /ns-* command."""
+    try:
+        with open(path, "rb") as f:
+            return bool(RUN_BYTES.search(f.read()))
+    except OSError:
+        return False
+
+
+def all_sessions():
+    return sorted(glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")), key=os.path.getmtime, reverse=True)
+
+
+def resolve(arg, project=None):
+    """Return (path, how). Never silent about which session it picked."""
+    if arg and os.path.isfile(arg):
+        return arg, "from the path you gave"
+    pool = all_sessions()
+    if arg:
+        hits = [p for p in pool if os.path.basename(p).startswith(arg)]
+        if not hits:
+            die("no session starting with %r under %s" % (arg, PROJECTS))
+        return hits[0], "picked by id"
+    if project:
+        pool = [p for p in pool if project in os.path.basename(os.path.dirname(p))]
+    here = project_dir_for(os.getcwd())
+    for p in pool:
+        if os.path.dirname(p) == here and has_ns(p):
+            return p, "latest in this project"
+    for p in pool:
+        if has_ns(p):
+            return p, "latest anywhere (none in this project)"
+    die("no session with ns-* skill runs found under %s" % PROJECTS)
+
+
+def die(msg):
+    sys.stderr.write("ns: %s\n" % msg)
+    sys.exit(1)
+
+
+def short_project(name):
+    return re.sub(r"^-Users-[^-]+-+(?:_?workspace-projects-)?", "", name) or name
+
+
+# ---------------------------------------------------------------- renderers
+
+def ph_color(i, n): return ramp(i, n)
+
+
+def render_phase_table(segs, width):
+    n = len(segs)
+    total = sum(s.eq for s in segs) or 1
+    has_sub = any(s.sub for s in segs)
+    cols = [("#", "r"), ("phase", "l"), ("time", "r"), ("calls", "r")] + ([("agent", "r")] if has_sub else []) + \
+           [("out", "r"), ("fresh", "r"), ("ctx peak", "r"), ("weighted", "r"), ("share", "r")]
+    rows = []
+    for i, s in enumerate(segs):
+        col = ph_color(i, n)
+        rows.append([rgb(col, mark_char(i)), rgb(col, s.name), dur(s.active()), str(len(s.main))] +
+                    ([str(len(s.sub)) if s.sub else dim("-")] if has_sub else []) +
+                    [tok(s.out), tok(s.new), tok(s.peak), bold(tok(s.eq)), "%d%%" % round(100 * s.eq / total)])
+    rows.append([""] + [dim("total")] + [dur(sum(s.active() for s in segs)), str(sum(len(s.main) for s in segs))] +
+                ([str(sum(len(s.sub) for s in segs))] if has_sub else []) +
+                [tok(sum(s.out for s in segs)), tok(sum(s.new for s in segs)), tok(max(s.peak for s in segs)),
+                 bold(tok(total)), ""])
+    lines, widths = table(cols, rows)
+    room = width - (sum(widths) + 2 * len(widths) + 4) - 1
+    if room >= 8:
+        bw = min(room, 28)
+        vmax = max(s.eq for s in segs)
+        lines[0] += "  " + dim("cost")
+        for i, s in enumerate(segs):
+            lines[i + 1] += "  " + bar(s.eq, vmax, bw, ph_color(i, n))
+    return lines
+
+
+def render_timeline(segs, width, label_w=11):
+    calls = [(c, i) for i, s in enumerate(segs) for c in s.calls if not c.sub]
+    if not calls:
+        return []
+    calls.sort(key=lambda x: x[0].ts)
+    cols = max(10, min(width - label_w - 4 - 14, 90))
+    bk = [calls[int(j * len(calls) / cols):max(int((j + 1) * len(calls) / cols), int(j * len(calls) / cols) + 1)] for j in range(cols)] \
+        if len(calls) >= cols else [[x] for x in calls]
+    n = len(segs)
+    ctx = [max(c.prompt for c, _ in b) for b in bk]
+    cost = [max(c.eq for c, _ in b) for b in bk]
+    idx = [b[0][1] for b in bk]
+    cm = max(ctx)
+    row = lambda name, vals, vmax: "  " + pad(dim(name), label_w) + "".join(rgb(ph_color(idx[k], n), ch) for k, ch in enumerate(spark(vals, vmax)))
+    return [row("context", ctx, cm) + "  " + dim("peak %s" % tok(cm)),
+            row("cost/call", cost, max(cost)) + "  " + dim("max %s" % tok(max(cost))),
+            "  " + pad(dim("phase #"), label_w) + "".join(rgb(ph_color(i, n), mark_char(i)) for i in idx)]
+
+
+def mix(segs):
+    cs = [c for s in segs for c in s.calls]
+    parts = [("cache read", sum(c.cr * W_CR for c in cs)), ("fresh input", sum(c.inp * W_INP + c.cw5 * W_CW5 + c.cw1 * W_CW1 for c in cs)),
+             ("output", sum(c.out * W_OUT for c in cs))]
+    t = sum(v for _, v in parts) or 1
+    return "  ".join("%s %d%%" % (k, round(100 * v / t)) for k, v in parts)
+
+
+def notes(rd, segs):
+    out, total = [], sum(s.eq for s in segs) or 1
+    top = max(segs, key=lambda s: s.eq)
+    out.append("%s is the largest run: %d%% of weighted tokens in %d calls (%s output)." %
+               (bold(top.name), round(100 * top.eq / total), len(top.main), tok(top.out)))
+    reads = sorted(rd.reads.items(), key=lambda kv: -kv[1])
+    for path, n in reads[:3]:
+        if n < 2:
+            break
+        size = os.path.getsize(path) // 4 if os.path.exists(path) else 0
+        out.append("%s was read %dx%s. Each read puts it in the context again." %
+                   (bold(os.path.basename(path)), n, " (about %s tokens each, %s in total)" % (tok(size), tok(size * n)) if size else ""))
+    calls = rd.sorted_calls()
+    main = [c for c in calls if not c.sub]
+    rebuilds = [(a, b) for a, b in zip(main, main[1:]) if b.prompt > 40000 and (b.cw1 + b.cw5) > 0.5 * b.prompt and (b.ts - a.ts).total_seconds() > 300]
+    cold = set(id(b) for _, b in rebuilds)
+    heavy = sorted((c for c in main[1:] if id(c) not in cold), key=lambda c: -c.new)[:3]
+    if heavy and heavy[0].new > 8000:
+        seg_of = {id(c): s for s in segs for c in s.calls}
+        out.append(["Largest single additions to the context:"] + [
+            "+%s at %s in %s (%s)" % (tok(c.new), clock(c.ts), seg_of[id(c)].label, trim(", ".join(c.tools[:2]) or "no tool", 40)) for c in heavy])
+    if rebuilds:
+        a, b = max(rebuilds, key=lambda p: p[1].eq)
+        out.append("%d cold cache rebuild%s. Worst: %s of context re-written after a %s idle gap (%s weighted). Resuming after a long pause writes the whole context again." %
+                   (len(rebuilds), "" if len(rebuilds) == 1 else "s", tok(b.prompt), dur((b.ts - a.ts).total_seconds()), tok(b.eq)))
+    sub_eq = sum(s.eq - sum(c.eq for c in s.main) for s in segs)
+    if sub_eq > 0.05 * total:
+        out.append("Subagents used %d%% of weighted tokens (%d calls)." % (round(100 * sub_eq / total), sum(len(s.sub) for s in segs)))
+    return out
+
+
+def note_lines(items, width):
+    out = []
+    for n in items:
+        if isinstance(n, list):  # a heading with sub-bullets
+            out += wrap(n[0], width) + ["      " + dim("-") + " " + x for x in n[1:]]
+        else:
+            out += wrap(n, width)
+    return out
+
+
+def render_usage(rd, segs, how, width):
+    cs = [c for s in segs for c in s.calls]
+    model = collections.Counter(c.model for c in cs if c.model and not c.sub).most_common(1)
+    first, last = min(c.ts for c in cs), max(c.ts for c in cs)
+    L = ["", "  " + head("ns usage") + "  " + dim("session %s  ·  %s  ·  %s" % (rd.id[:8], short_project(rd.project), how)),
+         "  " + dim("%s to %s  ·  active %s of %s wall  ·  %s" % (stamp(first), clock(last), dur(rd.active_seconds()),
+                                                                   dur((last - first).total_seconds()), model[0][0] if model else "?")), ""]
+    total = sum(s.eq for s in segs)
+    L += ["  " + head("TOTAL"),
+          "  %s weighted  ·  %s output  ·  %s fresh  ·  %s cache read  ·  %d calls" % (
+              bold(tok(total)), tok(sum(s.out for s in segs)), tok(sum(s.new for s in segs)), tok(sum(s.cr for s in segs)), len(cs)),
+          "  " + dim("where it goes:  " + mix(segs)), ""]
+    L += ["  " + head("RUNS") + dim("  in the order they ran")] + render_phase_table(segs, width) + [""]
+    tl = render_timeline(segs, width)
+    if tl:
+        L += ["  " + head("OVER TIME") + dim("  one cell per call, colored by run")] + tl + [""]
+    L += ["  " + head("NOTES") + dim("  measured from this transcript")] + note_lines(notes(rd, segs), width) + [""]
+    other = collections.defaultdict(lambda: [0, 0.0])
+    for c in cs:
+        if c.skill and not re.sub(r"^[a-z0-9-]+:", "", c.skill).startswith("ns-"):
+            other[c.skill][0] += 1
+            other[c.skill][1] += c.eq
+    if other:
+        L += ["  " + head("OTHER SKILLS") + dim("  already counted inside the runs above")]
+        for k, (n, eq) in sorted(other.items(), key=lambda kv: -kv[1][1])[:5]:
+            L.append("  · %s  %d calls  %s weighted" % (pad(k, 36), n, tok(eq)))
+        L.append("")
+    return L
+
+
+def render_calls(segs, top, phase, width):
+    rows = [(c, s) for s in segs for c in s.calls if phase is None or s.n == phase]
+    rows.sort(key=lambda x: x[0].ts)
+    if top:
+        keep = set(id(c) for c, _ in sorted(rows, key=lambda x: -x[0].eq)[:top])
+        rows = [r for r in rows if id(r[0]) in keep]
+    if not rows:
+        return ["  no calls to show"]
+    n, vmax = len(segs), max(c.eq for c, _ in rows)
+    cols = [("time", "l"), ("#", "r"), ("run", "l"), ("ctx", "r"), ("fresh", "r"), ("out", "r"), ("weighted", "r"), ("", "l"), ("tool", "l")]
+    body = []
+    for c, s in rows:
+        col = ph_color(s.n - 1, n)
+        body.append([clock(c.ts), rgb(col, mark_char(s.n - 1)), rgb(col, s.name) + (dim(" agent") if c.sub else ""), tok(c.prompt), tok(c.new),
+                     tok(c.out), bold(tok(c.eq)), bar(c.eq, vmax, 12, col), dim(trim(", ".join(c.tools[:2]) or "-", 34))])
+    return table(cols, body)[0]
+
+
+def render_watch(rd, segs, now, tick, width):
+    cs = [c for s in segs for c in s.calls]
+    last = max(c.ts for c in cs)
+    ago = (now - last).total_seconds()
+    cur = segs[-1]
+    live = ago < 120
+    dot = (good("●") if tick % 2 == 0 else dim("●")) if live else dim("○")
+    total = sum(s.eq for s in segs)
+    L = ["", "  %s %s  %s  %s" % (dot, head("ns watch") if live else dim("ns watch"), dim("session %s  ·  %s" % (rd.id[:8], short_project(rd.project))),
+                                  (good("live") if live else warn("idle")) + dim("  last call %s ago" % dur(ago))), ""]
+    col = ph_color(len(segs) - 1, len(segs))
+    L += ["  " + head("NOW") + "   " + rgb(col, bold(cur.name)) + dim("   run %d  ·  %s  ·  %d calls  ·  context %s" % (cur.n, dur(cur.active()), len(cur.main), tok(cur.last_ctx))),
+          "  " + head("RUN") + "   " + bold(tok(total)) + " weighted" + dim("  ·  %s output  ·  active %s  ·  %s" % (tok(sum(s.out for s in segs)), dur(rd.active_seconds()), mix(segs))), ""]
+    shown = segs[-10:]
+    if len(segs) > len(shown):
+        L.append("  " + dim("… %d earlier runs" % (len(segs) - len(shown))))
+    L += render_phase_table(shown, width)
+    L.append("")
+    tl = render_timeline(segs, width)
+    L += tl + [""] if tl else []
+    L += ["  " + head("LAST CALLS")]
+    last_rows = render_calls(segs, None, None, width)
+    L += last_rows[:1] + last_rows[-8:] if len(last_rows) > 9 else last_rows
+    L += ["", "  " + dim("ctrl-c to leave")]
+    return L
+
+
+def render_trend(sessions, days, width, show_retired=False):
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
+    runs = collections.defaultdict(list)
+    n_sessions = 0
+    for rd in sessions:
+        segs = segments(rd)
+        if not segs or segs[-1].end < cutoff:
+            continue
+        n_sessions += 1
+        for s in segs:
+            if s.label.startswith("ns-"):
+                runs[s.label].append((s.start, s.eq, s.out, s.active(), rd.id[:8]))
+    if not runs:
+        return ["  no ns-* runs in the last %d days" % days]
+    L = ["", "  " + head("ns trend") + dim("  %d sessions, last %d days, every run of every skill" % (n_sessions, days)), ""]
+    retired = sorted(k for k in runs if not any(os.path.exists(os.path.join(d, k, "SKILL.md")) for d in SKILL_DIRS))
+    if not show_retired:
+        runs = {k: v for k, v in runs.items() if k not in retired}
+    order = sorted(runs, key=lambda k: -sum(r[1] for r in runs[k]))
+    grand = sum(r[1] for k in runs for r in runs[k]) or 1
+    cols = [("skill", "l"), ("runs", "r"), ("median", "r"), ("max", "r"), ("last", "r"), ("vs median", "r"), ("total", "r"), ("share", "r"), ("each run, oldest to newest", "l")]
+    rows = []
+    for k in order:
+        rs = sorted(runs[k])
+        eqs = [r[1] for r in rs]
+        med = statistics.median(eqs)
+        ratio = eqs[-1] / med if med else 1
+        arrow = bad("▲ %.1fx" % ratio) if ratio >= 1.5 else good("▼ %.1fx" % ratio) if ratio <= 0.67 else dim("≈ %.1fx" % ratio)
+        rows.append([bold(k), str(len(rs)), tok(med), tok(max(eqs)), tok(eqs[-1]), arrow, tok(sum(eqs)),
+                     "%d%%" % round(100 * sum(eqs) / grand), rgb(BLUE, "".join(spark(eqs[-24:], min(max(eqs[-24:]), 3 * med) or None)))])
+    L += table(cols, rows)[0] + ["",
+        "  " + dim("weighted tokens per run. A run is one skill, from its first read to the next skill's. Sparks are clipped at 3x that skill's median, so one outlier cannot flatten the rest."),
+        "  " + dim("▲ means the latest run cost 1.5x its median or more. Drill into one session with:  ns usage <session id>"), ""]
+    if retired and not show_retired:
+        L.insert(-1, "  " + dim("%d retired skills hidden (%s). Show them with --retired." % (len(retired), ", ".join(retired))))
+    return L
+
+
+def render_sessions(paths, limit):
+    cols = [("session", "l"), ("project", "l"), ("started", "l"), ("active", "r"), ("runs", "r"), ("weighted", "r"), ("first skill", "l")]
+    rows = []
+    for p in paths:
+        if len(rows) >= limit:
+            break
+        if not has_ns(p):
+            continue
+        rd = Reader(p).refresh()
+        segs = segments(rd)
+        if not segs:
+            continue
+        rows.append([bold(rd.id[:8]), short_project(rd.project)[:28], stamp(segs[0].start), dur(rd.active_seconds()), str(len(segs)),
+                     bold(tok(sum(s.eq for s in segs))), next((s.label for s in segs if s.label.startswith("ns-")), "-")])
+    return ["", "  " + head("ns sessions") + dim("  most recent with ns-* runs"), ""] + (table(cols, rows)[0] if rows else ["  none found"]) + [""]
+
+
+# ---------------------------------------------------------------- help screen and logo
+
+def braille_logo(cells_w=32, cells_h=13):
+    W, H = cells_w * 2, cells_h * 4
+    px = set()
+
+    def dot(x, y):
+        if 0 <= x < W and 0 <= y < H:
+            px.add((x, y))
+
+    def line(x0, y0, x1, y1, dotted=True):
+        n = max(abs(x1 - x0), abs(y1 - y0)) or 1
+        for i in range(n + 1):
+            if not dotted or i % 2 == 0:
+                dot(round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n))
+
+    def ring(cx, cy, r):
+        x, y, e = r, 0, 1 - r
+        while x >= y:
+            for a, b in ((x, y), (y, x), (-x, y), (-y, x), (x, -y), (y, -x), (-x, -y), (-y, -x)):
+                dot(cx + a, cy + b)
+            y += 1
+            if e < 0: e += 2 * y + 1
+            else:
+                x -= 1
+                e += 2 * (y - x) + 1
+
+    cy = H // 2
+    r = 5
+    router, ship = (r + 1, cy), (W - r - 3, cy)
+    mids = [(W // 2, r + 1), (W // 2, cy), (W // 2, H - r - 3)]
+    for m in mids:
+        line(router[0] + r, router[1], m[0] - r, m[1])
+        line(m[0] + r, m[1], ship[0] - r, ship[1])
+    line(mids[0][0], mids[0][1] + r, mids[1][0], mids[1][1] - r)
+    line(mids[1][0], mids[1][1] + r, mids[2][0], mids[2][1] - r)
+    for nx, ny in [router, ship] + mids:
+        ring(nx, ny, r)
+    bits = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))
+    out = []
+    for r in range(cells_h):
+        s = ""
+        for c in range(cells_w):
+            m = 0
+            for dy in range(4):
+                for dx in range(2):
+                    if (c * 2 + dx, r * 4 + dy) in px:
+                        m |= bits[dy][dx]
+            s += rgb(lerp(GREEN, BLUE, c / (cells_w - 1)), chr(0x2800 + m)) if m else " "
+        out.append(s)
+    return out
+
+
+def help_screen():
+    t = lambda s: head(s)
+    c = lambda name, d: "  " + bold(pad(name, 11)) + d
+    left = ["ns", "", "Live view and token usage for the ns-* skills", "",
+            t("USAGE"), "  " + dim("%") + " ns <command> [options]", "",
+            t("COMMANDS"),
+            c("usage", "Tokens per skill run, in order, for one session"),
+            c("trend", "Tokens per skill over time, across sessions"),
+            c("calls", "Every model call in a session, with its cost"),
+            c("watch", "Live view of the running session"),
+            c("phase", "One line for the current run (flows print it)"),
+            c("sessions", "List recent sessions that used ns-* skills"),
+            c("demo", "Replay a sample run, add --live to watch it fill"),
+            c("selftest", "Check the reader against a built-in sample"), "",
+            t("TRY IT"),
+            "  " + dim("%") + " ns demo --live", "  " + dim("%") + " ns usage", "  " + dim("%") + " ns trend --days 14",
+            "  " + dim("%") + " ns calls --top 15", "  " + dim("%") + " ns watch", "",
+            t("TOKENS"),
+            "  " + dim("weighted = input 1x, cache write 1.25x or 2x, cache read 0.1x, output 5x"),
+            "  " + dim("It ranks where cost goes. It is not a bill."), "",
+            ital(dim("Run 'ns <command> --help' for more information on a command.")), ""]
+    w = term_width()
+    if w < 100:
+        return left
+    logo = braille_logo()
+    lw = max(vlen(x) for x in left)
+    x0 = max(lw + 4, w - 36)
+    return [pad(left[i] if i < len(left) else "", x0) + (logo[i - 4] if 4 <= i < 4 + len(logo) else "") for i in range(max(len(left), 4 + len(logo)))]
+
+
+# ---------------------------------------------------------------- built-in sample run
+
+SCRIPT = [  # label, kind, calls, agent calls, minutes, tools
+    ("ns-flow-ticket", "slash", 4, 0, 1.5, ["AskUserQuestion", "Read ticket.md", "Bash"]),
+    ("ns-to-split-ticket", "read", 3, 0, 1.5, ["Read ticket.md", "Bash"]),
+    ("ns-to-branch", "read", 6, 0, 2, ["Bash", "AskUserQuestion"]),
+    ("ns-to-scope-check", "read", 14, 0, 7, ["Read page.tsx", "Grep", "AskUserQuestion"]),
+    ("ns-to-implement", "read", 40, 0, 16, ["Edit page.tsx", "Write notes.test.ts", "Bash", "Read schema.ts"]),
+    ("ns-to-verify", "read", 38, 0, 14, ["Bash", "Read screenshot.png", "Bash", "Read report.md"]),
+    ("ns-to-understand", "read", 8, 0, 4, ["Read page.tsx", "Bash"]),
+    ("ns-to-review", "read", 46, 12, 22, ["Edit page.tsx", "AskUserQuestion", "Read page.tsx", "Agent"]),
+    ("ns-to-quality-check", "read", 22, 0, 9, ["Bash", "Bash", "AskUserQuestion"]),
+    ("ns-to-save", "read", 6, 0, 3, ["Bash"]),
+    ("ns-to-pr", "read", 44, 0, 19, ["Bash", "Artifact", "Write body.md", "Bash"]),
+    ("ns-to-deploy", "read", 24, 0, 10, ["Bash", "AskUserQuestion", "Bash"]),
+    ("ns-to-observe", "read", 18, 0, 9, ["Bash", "Bash", "AskUserQuestion"]),
+    ("ns-to-close", "read", 8, 0, 3, ["Bash", "Edit ticket.md"]),
+]
+GAP_BEFORE = {"ns-to-deploy": 80 * 60}  # an idle gap over the cache lifetime, so the sample shows a cold rebuild
+
+
+def sample_events(t0, seed=7):
+    """Return (sim_seconds, is_agent, entry) tuples, in order. Each message is written twice,
+    as a text block and as a tool_use block, the way real transcripts do."""
+    import random
+    rnd = random.Random(seed)
+    ev, t, ctx, k = [], 0.0, 22000, 0
+
+    def entry(ts, mid, ctx_now, new, out, tools, agent):
+        cw = new
+        usage = {"input_tokens": 2, "cache_creation_input_tokens": cw, "cache_read_input_tokens": max(0, ctx_now - cw - 2),
+                 "output_tokens": out, "cache_creation": {"ephemeral_1h_input_tokens": cw, "ephemeral_5m_input_tokens": 0}}
+        stamp_ = (t0 + dt.timedelta(seconds=ts)).strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % rnd.randrange(1000)
+        base = {"type": "assistant", "isSidechain": agent, "timestamp": stamp_, "sessionId": "demo"}
+        text = dict(base, message={"id": mid, "model": "claude-sonnet-5-5", "role": "assistant", "usage": usage, "content": [{"type": "text", "text": "..."}]})
+        use = dict(base, message={"id": mid, "model": "claude-sonnet-5-5", "role": "assistant", "usage": usage,
+                                  "content": [{"type": "tool_use", "id": "t" + mid, "name": n.split()[0], "input": ({"file_path": "/x/" + n.split()[1]} if " " in n else {})} for n in tools]})
+        return [text, use]
+
+    for label, kind, calls, agents, minutes, tools in SCRIPT:
+        t += GAP_BEFORE.get(label, 0)
+        step = minutes * 60.0 / (calls + 1)
+        if kind == "slash":
+            ev.append((t, False, {"type": "user", "timestamp": (t0 + dt.timedelta(seconds=t)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                                  "message": {"role": "user", "content": "<command-name>/%s</command-name>" % label}}))
+        for i in range(calls):
+            t += step * rnd.uniform(0.5, 1.5)
+            k += 1
+            if GAP_BEFORE.get(label) and i == 0:
+                new = ctx  # cold cache: the whole context is written again
+            else:
+                new = int(rnd.expovariate(1 / 1100)) + 300
+                if label in ("ns-to-verify", "ns-to-pr") and rnd.random() < 0.07:
+                    new += rnd.randrange(8000, 25000)
+                ctx += new
+            if i == 0 and kind == "read":
+                mine = ["Read SKILL.md"]
+            elif i == 1:
+                mine = ["Read core.md"]
+            else:
+                mine = [rnd.choice(tools)]
+            ev.append((t, False, ("skill", label, mine, ctx, new, int(rnd.expovariate(1 / 260)) + 40, "m%d" % k)))
+        for j in range(agents):
+            t_a = t - minutes * 60 * rnd.uniform(0.2, 0.8)
+            k += 1
+            ev.append((t_a, True, ("agent", label, ["Read page.tsx"], 30000 + j * 2500, 2500, 400, "a%d" % k)))
+    ev.sort(key=lambda e: e[0])
+    out = []
+    for ts, agent, e in ev:
+        if isinstance(e, dict):
+            out.append((ts, False, [e]))
+            continue
+        _, label, tools, c, new, o, mid = e
+        recs = entry(ts, mid, c, new, o, tools, agent)
+        if tools[0] == "Read SKILL.md":
+            recs[1]["message"]["content"][0]["input"] = {"file_path": "%s/.claude/skills/%s/SKILL.md" % (HOME, label)}
+        elif tools[0] == "Read core.md":
+            recs[1]["message"]["content"][0]["input"] = {"file_path": "%s/.claude/skills/ns-route/references/core.md" % HOME}
+        out.append((ts, agent, recs))
+    return out
+
+
+def write_sample(root, t0):
+    """Write the sample as a real-looking project dir. Returns the main transcript path."""
+    proj = os.path.join(root, "-Users-demo--workspace-projects-sample-app")
+    sid = "d3m0d3m0-0000-4000-8000-000000000001"
+    os.makedirs(os.path.join(proj, sid, "subagents"), exist_ok=True)
+    main, sub = os.path.join(proj, sid + ".jsonl"), os.path.join(proj, sid, "subagents", "agent-demo.jsonl")
+    with open(main, "w") as fm, open(sub, "w") as fs:
+        for _, agent, recs in sample_events(t0):
+            for r in recs:
+                (fs if agent else fm).write(json.dumps(r, separators=(",", ":")) + "\n")
+    return main
+
+
+# ---------------------------------------------------------------- commands
+
+def need_segs(rd):
+    segs = segments(rd)
+    if not segs:
+        die("session %s has no model calls with usage yet" % rd.id[:8])
+    return segs
+
+
+def open_session(args):
+    path, how = resolve(getattr(args, "session", None), getattr(args, "project", None))
+    return Reader(path).refresh(), how
+
+
+def cmd_usage(a):
+    rd, how = open_session(a)
+    if not rd.has_runs():
+        print("  session %s has no ns-* skill runs. Nothing to attribute." % rd.id[:8])
+        return
+    print("\n".join(render_usage(rd, need_segs(rd), how, term_width())))
+
+
+def cmd_calls(a):
+    rd, how = open_session(a)
+    segs = need_segs(rd)
+    print("\n" + "\n".join(["  " + head("ns calls") + "  " + dim("session %s  ·  %s" % (rd.id[:8], how)) + (dim("  ·  heaviest %d" % a.top) if a.top else ""), ""] +
+                            render_calls(segs, a.top, a.phase, term_width())) + "\n")
+
+
+def cmd_phase(a):
+    rd, how = open_session(a)
+    segs = need_segs(rd)
+    s, total = segs[-1], sum(x.eq for x in segs)
+    print("%s · %s · %s weighted tokens (%d%% of the run so far) · %d calls · context %s" %
+          (s.name, dur(s.active()), tok(s.eq), round(100 * s.eq / (total or 1)), len(s.main), tok(s.last_ctx)))
+
+
+def cmd_trend(a):
+    paths = [p for p in all_sessions() if (not a.project or a.project in os.path.basename(os.path.dirname(p))) and has_ns(p)]
+    print("\n".join(render_trend([Reader(p).refresh() for p in paths], a.days, term_width(), a.retired)))
+
+
+def cmd_sessions(a):
+    print("\n".join(render_sessions(all_sessions(), a.limit)))
+
+
+def watch_loop(rd, interval, feeder=None, now_fn=None, once=False):
+    tty = sys.stdout.isatty() and not once
+    now_fn = now_fn or (lambda: dt.datetime.now(dt.timezone.utc))
+    if tty:
+        sys.stdout.write("\x1b[?1049h\x1b[?25l")
+    tick = 0
+    try:
+        while True:
+            if feeder:
+                feeder()
+            rd.refresh()
+            segs = segments(rd)
+            frame = render_watch(rd, segs, now_fn(), tick, term_width()) if segs else ["", "  waiting for the first model call in %s ..." % rd.id[:8]]
+            sys.stdout.write(("\x1b[H\x1b[J" if tty else "") + "\n".join(frame) + "\n")
+            sys.stdout.flush()
+            if not tty or (feeder and getattr(feeder, "done", False)):
+                return
+            tick += 1
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if tty:
+            sys.stdout.write("\x1b[?25h\x1b[?1049l")
+
+
+def cmd_watch(a):
+    rd, how = open_session(a)
+    watch_loop(rd, a.interval, once=a.once)
+
+
+def cmd_demo(a):
+    root = tempfile.mkdtemp(prefix="ns-demo-")
+    try:
+        os.environ["NS_PROJECTS_DIR"] = root
+        global PROJECTS
+        PROJECTS = root
+        if a.live:
+            demo_live(root, a.speed)
+            return
+        t0 = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)
+        rd = Reader(write_sample(root, t0)).refresh()
+        segs = segments(rd)
+        w = term_width()
+        print("\n  " + warn("sample data") + dim("  a made-up ticket run, so you can see every view. Nothing here is from your sessions."))
+        print("\n".join(render_usage(rd, segs, "demo", w)))
+        print("  " + head("ns calls --top 8") + "\n")
+        print("\n".join(render_calls(segs, 8, None, w)))
+        s4, tot = segs[4], sum(x.eq for x in segs[:5])
+        print("\n  " + head("What a flow prints at the end of a phase") + dim("  (from ns phase)"))
+        print("  " + "%s · %s · %s weighted tokens (%d%% of the run so far) · %d calls · context %s\n" %
+              (s4.name, dur(s4.active()), tok(s4.eq), round(100 * s4.eq / tot), len(s4.main), tok(s4.last_ctx)))
+        print(dim("  Next: ns demo --live   (watch a run fill in)   ·   ns usage   (your latest real session)\n"))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def demo_live(root, speed):
+    """Replay the sample into a transcript at `speed` simulated seconds per real second, and watch it."""
+    t0 = dt.datetime.now(dt.timezone.utc)
+    evs = sample_events(t0)
+    proj = os.path.join(root, "-Users-demo--workspace-projects-sample-app")
+    sid = "d3m0d3m0-0000-4000-8000-000000000001"
+    os.makedirs(os.path.join(proj, sid, "subagents"), exist_ok=True)
+    main, sub = os.path.join(proj, sid + ".jsonl"), os.path.join(proj, sid, "subagents", "agent-demo.jsonl")
+    open(main, "w").close(), open(sub, "w").close()
+    start, state = time.time(), {"i": 0, "skip": 0.0}
+
+    def sim_now(): return (time.time() - start) * speed + state["skip"]
+
+    def feeder():
+        # fast-forward over the sample's long idle gap, leaving a moment where the view shows "idle"
+        if state["i"] < len(evs) and evs[state["i"]][0] - sim_now() > 900:
+            state["skip"] += evs[state["i"]][0] - sim_now() - 120
+        while state["i"] < len(evs) and evs[state["i"]][0] <= sim_now():
+            _, agent, recs = evs[state["i"]]
+            with open(sub if agent else main, "a") as f:
+                f.write("".join(json.dumps(r, separators=(",", ":")) + "\n" for r in recs))
+            state["i"] += 1
+        feeder.done = state["i"] >= len(evs)
+
+    feeder.done = False
+    rd = Reader(main)
+    watch_loop(rd, 0.5, feeder, lambda: t0 + dt.timedelta(seconds=sim_now()))
+    print("\n  " + dim("replay finished. This is what ns watch shows for a real run: ") + bold("ns watch") + "\n")
+
+
+def cmd_selftest(a):
+    root = tempfile.mkdtemp(prefix="ns-test-")
+    fails = []
+
+    def check(name, ok, detail=""):
+        print("  %s %s%s" % (good("✓") if ok else bad("✗"), name, dim("  " + detail) if detail and not ok else ""))
+        if not ok:
+            fails.append(name)
+
+    try:
+        t0 = dt.datetime(2026, 10, 1, 9, 0, tzinfo=dt.timezone.utc)
+        rd = Reader(write_sample(root, t0)).refresh()
+        segs = segments(rd)
+        labels = [s.label for s in segs]
+        print("\n  " + head("ns selftest") + dim("  built-in sample, no real data\n"))
+        check("runs appear in order", labels == [x[0] for x in SCRIPT], str(labels))
+        check("a message written twice is counted once", len([c for c in rd.calls.values() if not c.sub]) == sum(x[2] for x in SCRIPT),
+              "%d" % len(rd.calls))
+        check("agent calls are attributed to the run they happened in", [len(s.sub) for s in segs if s.label == "ns-to-review"] == [12])
+        check("every call lands in exactly one run", sum(len(s.calls) for s in segs) == len(rd.sorted_calls()))
+        u = {"inp": 2, "cw1": 1000, "cw5": 0, "cr": 10000, "out": 100}
+        c = Call("x", t0, False)
+        c.inp, c.cw1, c.cw5, c.cr, c.out = u["inp"], u["cw1"], u["cw5"], u["cr"], u["out"]
+        check("weighted tokens use the 1 / 2 / 1.25 / 0.1 / 5 ratios", abs(c.eq - (2 + 2000 + 1000 + 500)) < 1e-9, str(c.eq))
+        check("the idle gap is not counted as active time", rd.active_seconds() < 3.2 * 3600, dur(rd.active_seconds()))
+        again = Reader(rd.path)
+        again.marks = rd.marks + [(rd.marks[-1][0], rd.marks[-1][1])]
+        again.calls = rd.calls
+        check("a repeated read of the same skill stays one run", len(segments(again)) == len(segs))
+        check("a half-written last line waits for the next refresh", half_line_ok(root))
+        check("project folder name matches Claude Code's encoding",
+              project_dir_for("/Users/a/_w/p-x.y") == os.path.join(PROJECTS, "-Users-a--w-p-x-y"))
+        out = "\n".join(render_usage(rd, segs, "selftest", 100))
+        check("long notes wrap inside the width", all(vlen(x) <= 100 for x in out.splitlines()), str(max(vlen(x) for x in out.splitlines())))
+        check("usage renders every run", all(x[0] in out for x in SCRIPT))
+        check("the notes find the repeated core.md reads and the cold rebuild", "core.md" in out and "cold cache rebuild" in out)
+        check("watch renders", len(render_watch(rd, segs, dt.datetime.now(dt.timezone.utc), 0, 100)) > 10)
+        check("trend renders", "ns-to-review" in "\n".join(render_trend([rd], 36500, 100)))
+        print()
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    if fails:
+        sys.exit(1)
+    print("  " + good("all checks passed") + "\n")
+
+
+def half_line_ok(root):
+    p = os.path.join(root, "half.jsonl")
+    line = json.dumps({"type": "assistant", "timestamp": "2026-10-01T09:00:00.000Z", "message": {"id": "h1", "usage": {"output_tokens": 5}, "content": []}}, separators=(",", ":"))
+    with open(p, "w") as f:
+        f.write(line[:40])
+    rd = Reader(p).refresh()
+    before = len(rd.calls)
+    with open(p, "a") as f:
+        f.write(line[40:] + "\n")
+    return before == 0 and len(rd.refresh().calls) == 1
+
+
+# ---------------------------------------------------------------- main
+
+def main():
+    ap = argparse.ArgumentParser(prog="ns", add_help=False)
+    ap.add_argument("--color", dest="color", action="store_true", default=None)
+    ap.add_argument("--no-color", dest="color", action="store_false")
+    sub = ap.add_subparsers(dest="cmd")
+
+    def add(name, fn, **kw):
+        p = sub.add_parser(name, **kw)
+        p.set_defaults(fn=fn)
+        return p
+
+    def sess(p):
+        p.add_argument("session", nargs="?", help="session id (prefix) or a .jsonl path. Default: the latest session in this project with ns-* runs")
+        p.add_argument("--project", help="only look in project folders whose name contains this")
+
+    p = add("usage", cmd_usage, help="tokens per skill run, in order, for one session"); sess(p)
+    p = add("calls", cmd_calls, help="every model call with its cost"); sess(p)
+    p.add_argument("--top", type=int, help="only the N heaviest calls, still in time order")
+    p.add_argument("--phase", type=int, help="only the calls of run number N (the # column of ns usage)")
+    p = add("phase", cmd_phase, help="one line about the current run"); sess(p)
+    p = add("watch", cmd_watch, help="live view of the running session"); sess(p)
+    p.add_argument("--interval", type=float, default=1.0)
+    p.add_argument("--once", action="store_true", help="print one frame and exit")
+    p = add("trend", cmd_trend, help="tokens per skill over time, across sessions")
+    p.add_argument("--days", type=int, default=30)
+    p.add_argument("--project")
+    p.add_argument("--retired", action="store_true", help="also show skills that no longer exist")
+    p = add("sessions", cmd_sessions, help="list recent sessions that used ns-* skills")
+    p.add_argument("--limit", type=int, default=12)
+    p = add("demo", cmd_demo, help="replay a made-up run")
+    p.add_argument("--live", action="store_true", help="replay it into a transcript and watch it fill in")
+    p.add_argument("--speed", type=float, default=240, help="simulated seconds per real second for --live")
+    add("selftest", cmd_selftest, help="check the reader against a built-in sample")
+    add("help", None, help="show the overview")
+
+    if sys.argv[1:] in (["-h"], ["--help"]):
+        sys.argv[1:] = ["help"]
+    flags = [a for a in sys.argv[1:] if a in ("--color", "--no-color")]  # allowed anywhere
+    sys.argv[1:] = flags + [a for a in sys.argv[1:] if a not in flags]
+    args = ap.parse_args()
+    Style.on = args.color if args.color is not None else (sys.stdout.isatty() and "NO_COLOR" not in os.environ)
+    if not args.cmd or args.cmd == "help":
+        print("\n" + "\n".join(help_screen()))
+        return
+    try:
+        args.fn(args)
+    except BrokenPipeError:
+        pass
+
+
+if __name__ == "__main__":
+    main()
