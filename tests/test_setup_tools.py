@@ -28,6 +28,13 @@ class Sandbox:
         self.home = self.tmp / "home"
         self.home.mkdir()
         self.log = self.tmp / "calls.log"
+        # only these real tools are visible: whatever else is installed on the machine running the tests must not leak in
+        import shutil
+        for name in ("bash", "sh", "sed", "grep", "env", "cat"):
+            real = shutil.which(name)
+            if real:
+                (self.bin / name).symlink_to(real)
+        (self.bin / "python3").symlink_to(sys.executable)
         return self
 
     def __exit__(self, *a):
@@ -43,8 +50,7 @@ class Sandbox:
         return "".join(l + "\n" for l in lines if l != "claude plugin list")
 
     def env(self):
-        # /usr/bin and /bin stay on PATH for sh, sed, grep and cat; the tools under test come first and are fakes
-        return dict(os.environ, PATH="%s:/usr/bin:/bin" % self.bin, HOME=str(self.home), NO_COLOR="1")
+        return dict(os.environ, PATH=str(self.bin), HOME=str(self.home), NO_COLOR="1")
 
     def run(self, cmd, **kw):
         r = subprocess.run(cmd, capture_output=True, text=True, env=self.env(), stdin=subprocess.DEVNULL, start_new_session=True, **kw)
@@ -124,6 +130,13 @@ class SetupScriptTests(unittest.TestCase):
         (sb.home / ".agents" / "skills" / "grilling").mkdir(parents=True)
         sb.run(["bash", str(SETUP), "--yes", "--only", "plugins", "--harness", "codex,opencode,cursor"])
         self.assertNotIn("mattpocock", sb.calls())
+
+    def test_yes_never_starts_an_interactive_login(self):
+        sb = self.sandbox()
+        fake(sb.bin, "gh", 'if [ "$1 $2" = "auth status" ]; then exit 1; fi\necho "gh $*" >> "%s"' % sb.log)
+        code, out = sb.run(["bash", str(SETUP), "--yes", "--only", "core"])
+        self.assertNotIn("auth login", sb.calls(), out)
+        self.assertIn("gh auth login", out)  # the user is told to do it
 
     def test_a_failed_install_makes_the_script_fail(self):
         sb = self.sandbox()

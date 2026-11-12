@@ -106,7 +106,9 @@ if group_on core; then
   fi
   need_system gh gh
   if has gh; then
-    if gh auth status >/dev/null 2>&1; then say " ok gh is logged in"; else step "gh-login" "gh auth login"; fi
+    if gh auth status >/dev/null 2>&1; then say " ok gh is logged in"
+    elif [ "$ASSUME_YES" = 1 ]; then say " - gh is not logged in: run 'gh auth login' yourself (it needs you, so --yes skips it)"; SKIPPED="$SKIPPED gh-login"
+    else step "gh-login" "gh auth login"; fi
   fi
   say " ok gh-axi runs through npx, nothing to install"
 fi
