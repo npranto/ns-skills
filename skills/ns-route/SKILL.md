@@ -14,6 +14,8 @@ The workflow files in `../ns-route/references/workflows/` own every workflow cha
 
 Router, and the runner for workflows that have no flow skill. While routing (steps 0-4) it never edits project files, writes docs, creates tickets, or implements. Only once the user chooses to run (step 5) does it hand off to a flow or follow the phases in order.
 
+Start every run with `python3 ../ns-route/scripts/ns doctor --quiet` (read-only, instant). If it prints a line, show it once and carry on: it names tools the skills use that are not installed.
+
 ## 0. Already know what you need?
 
 If the user names a clear, ordinary situation, pick its workflow from `../ns-route/references/workflows/index.md` ("Pick a workflow"), print that workflow's diagram and notes from its file beside it, and go straight to step 5 - no classification needed.

@@ -55,7 +55,7 @@ A page that does not exist on the base has no base: say `new page`. Run twice an
 
 ## Accessibility (when the diff calls for it)
 
-- An automated scan (the repo's own axe setup, else `@axe-core/playwright`): no serious or critical violation.
+- An automated scan (the repo's own axe setup, else the `axe` CLI from `@axe-core/cli` if installed, else `@axe-core/playwright`): no serious or critical violation.
 - Walk the keyboard path with Tab, Shift+Tab, Enter, Space, and Escape: every control reachable, focus visible and in a sensible order, focus returned when a dialog closes.
 - Labels and names on every new control, and contrast on new text.
 

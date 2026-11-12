@@ -33,18 +33,34 @@ npx skills add npranto/ns-skills
 
 Commands are then plain, for example `/ns-route` in Claude Code and `$ns-route` in Codex.
 
-## Requirements
+## Requirements and setup
 
-Required: git. The tools below are used by the phases that need them. When one is missing, the phase says so at the step instead of guessing; the full table, with fallbacks, is in [skills/ns-route/references/topic-tools.md](skills/ns-route/references/topic-tools.md).
+The skills call a few command-line tools. Install them once per machine, with one command that asks before every step:
 
-| Tool | Used for |
-|---|---|
-| `gh-axi` | GitHub issues, pull requests and CI |
-| `playwright-cli`, `chrome-devtools-axi` | browser proof in `ns-to-verify` |
-| `lighthouse` | performance checks |
-| `ffmpeg` | video evidence |
-| `herdr` | delegating tickets to other agents (`ns-flow-delegate`) |
-| the `mattpocock-skills` plugin | some phases call its skills (grilling, TDD, domain modeling); without it they follow the same practice inline and say so |
+```
+curl -fsSL https://raw.githubusercontent.com/npranto/ns-skills/main/scripts/setup-tools.sh | bash
+```
+
+(or `bash scripts/setup-tools.sh` from a clone). Options: `--only core,ui,delegate,vercel,plugins`, `--harness claude,codex,opencode,cursor`, `--dry-run`, `--yes`. It uses Homebrew for system tools and npm for the rest, never upgrades or removes anything, and works on macOS and Linux (Windows: WSL).
+
+Check the result at any time, from any harness, with `python3 <skills folder>/ns-route/scripts/ns doctor`. The router also runs `ns doctor --quiet` at the start of a run and shows one line when a tool is missing.
+
+| Group | Tool | Used for |
+|---|---|---|
+| core | `git` | everything |
+| core | Node 20+ and npm | runs `gh-axi` and `chrome-devtools-axi` through `npx` |
+| core | Python 3.9+ | the `ns` usage tool behind every phase footer |
+| core | `gh`, logged in (`gh auth login`) | `gh-axi` wraps it: issues, pull requests, CI |
+| ui | `playwright-cli` (`@playwright/cli`) | browser proof, screenshots, clips in `ns-to-verify` |
+| ui | `chrome-devtools-axi` and Google Chrome | console, network and accessibility checks |
+| ui | `lighthouse` | web vitals |
+| ui | `ffmpeg` | clips |
+| ui | `axe` (`@axe-core/cli`) | accessibility scan when the repo has no axe setup of its own |
+| delegate | `herdr` and `claude` | `ns-flow-delegate` runs one agent per ticket |
+| vercel | `vercel` | only for projects deployed on Vercel |
+| plugins | the `mattpocock-skills` skills | grilling, TDD, domain modeling and more; without them the skills follow the same practice inline and say so |
+
+A missing tool is reported at the step that needs it instead of being guessed around. Defaults and fallbacks: [skills/ns-route/references/topic-tools.md](skills/ns-route/references/topic-tools.md).
 
 ## Harness notes
 
@@ -66,6 +82,8 @@ Nothing is needed up front. `ns-to-start` (and any phase that needs a convention
 Run the checks before every change, see [docs/MAINTENANCE.md](docs/MAINTENANCE.md). The changelog is generated from GitHub releases, so do not edit it by hand.
 
 ## Credits
+
+`skills/ns-route/references/herdr.md` is the herdr agent skill from [herdrdev/herdr](https://github.com/herdrdev/herdr), copied under the Apache License 2.0 (copy in [licenses/herdr-APACHE-2.0.txt](licenses/herdr-APACHE-2.0.txt)).
 
 `ns-to-verify`'s setup guide and several principles in `ns-route/references/principles.md` are adapted from pstack by poteto (MIT). The workflow ideas lean on Matt Pocock's skills. See [LICENSE](LICENSE).
 

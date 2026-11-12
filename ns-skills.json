@@ -50,31 +50,168 @@
   "requirements": {
     "plugins": {
       "mattpocock-skills": {
-        "required_by": [],
-        "fallback": "follow the philosophy inline and say so"
+        "required_by": [
+          "ns-flow-architecture",
+          "ns-flow-bugfix",
+          "ns-flow-delegate",
+          "ns-flow-docs",
+          "ns-flow-existing-project",
+          "ns-route",
+          "ns-to-architect",
+          "ns-to-branch",
+          "ns-to-capture-idea",
+          "ns-to-deploy",
+          "ns-to-design",
+          "ns-to-discover-codebase",
+          "ns-to-docs",
+          "ns-to-grill-me",
+          "ns-to-implement",
+          "ns-to-postmortem",
+          "ns-to-pr",
+          "ns-to-quality-check",
+          "ns-to-review",
+          "ns-to-scope-check",
+          "ns-to-start",
+          "ns-to-verify",
+          "ns-to-wayfinder"
+        ],
+        "fallback": "follow the philosophy inline and say so",
+        "group": "plugins",
+        "install": "Claude Code: claude plugin install mattpocock-skills@claude-plugins-official; other harnesses: npx skills add mattpocock/skills -g"
       }
     },
     "tools": {
-      "playwright-cli": {
-        "required_by": []
+      "git": {
+        "group": "core",
+        "install": "brew install git",
+        "required_by": [
+          "all"
+        ]
       },
-      "chrome-devtools-axi": {
-        "required_by": []
+      "node": {
+        "group": "core",
+        "install": "brew install node (20 or newer)",
+        "required_by": [
+          "all"
+        ]
+      },
+      "python3": {
+        "group": "core",
+        "install": "Python 3.9 or newer",
+        "required_by": [
+          "ns-route"
+        ]
+      },
+      "gh": {
+        "group": "core",
+        "install": "brew install gh, then gh auth login",
+        "required_by": [
+          "ns-flow-delegate",
+          "ns-route",
+          "ns-to-branch",
+          "ns-to-close",
+          "ns-to-deploy",
+          "ns-to-pr",
+          "ns-to-review",
+          "ns-to-rollback",
+          "ns-to-stakeholder-brief",
+          "ns-to-verify"
+        ]
       },
       "gh-axi": {
-        "required_by": []
+        "group": "core",
+        "install": "runs through npx -y gh-axi (needs Node 20+ and gh)",
+        "required_by": [
+          "ns-flow-delegate",
+          "ns-route",
+          "ns-to-branch",
+          "ns-to-close",
+          "ns-to-deploy",
+          "ns-to-pr",
+          "ns-to-review",
+          "ns-to-rollback",
+          "ns-to-stakeholder-brief",
+          "ns-to-verify"
+        ]
+      },
+      "playwright-cli": {
+        "group": "ui",
+        "install": "npm i -g @playwright/cli",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
+      },
+      "chrome-devtools-axi": {
+        "group": "ui",
+        "install": "runs through npx -y chrome-devtools-axi (needs Node 20+ and Google Chrome)",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
+      },
+      "google-chrome": {
+        "group": "ui",
+        "install": "install Google Chrome",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
       },
       "lighthouse": {
-        "required_by": []
+        "group": "ui",
+        "install": "npm i -g lighthouse",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
       },
       "ffmpeg": {
-        "required_by": []
+        "group": "ui",
+        "install": "brew install ffmpeg",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
+      },
+      "axe": {
+        "group": "ui",
+        "install": "npm i -g @axe-core/cli",
+        "required_by": [
+          "ns-route",
+          "ns-to-verify"
+        ]
       },
       "herdr": {
+        "group": "delegate",
+        "install": "brew install herdr",
         "required_by": [
           "ns-flow-delegate"
         ]
+      },
+      "claude": {
+        "group": "delegate",
+        "install": "install Claude Code",
+        "required_by": [
+          "ns-flow-delegate"
+        ]
+      },
+      "vercel": {
+        "group": "vercel",
+        "install": "npm i -g vercel",
+        "required_by": [
+          "ns-flow-delegate",
+          "ns-route",
+          "ns-to-deploy",
+          "ns-to-observe",
+          "ns-to-quality-check",
+          "ns-to-verify"
+        ]
       }
+    },
+    "setup": {
+      "script": "scripts/setup-tools.sh",
+      "check": "python3 skills/ns-route/scripts/ns doctor"
     }
   }
 }

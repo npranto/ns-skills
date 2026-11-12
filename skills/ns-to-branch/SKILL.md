@@ -19,7 +19,7 @@ Run and read: `git rev-parse --is-inside-work-tree`, `git status --porcelain=v1 
 Stop and explain, offering the fix, when:
 
 - **Not a git repo**: offer `git init` (ask first), otherwise stop.
-- **Merge, rebase, cherry-pick, or bisect in progress**: do not branch. Offer `mattpocock-skills:resolving-merge-conflicts` or the abort command, and let the user choose.
+- **Merge, rebase, cherry-pick, or bisect in progress**: do not branch. Offer `mattpocock-skills:resolving-merge-conflicts` (if the plugin has it) or the abort command, and let the user choose.
 - **Detached HEAD**: say so, and treat the base as an explicit choice in step 4.
 - **No commits yet**: an unborn branch cannot be a base. Ask whether to create an initial commit first.
 

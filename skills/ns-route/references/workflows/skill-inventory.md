@@ -45,7 +45,7 @@
 | `mattpocock-skills:codebase-design` | `architect`, architecture |
 | `mattpocock-skills:code-review` | `review` |
 | `mattpocock-skills:wizard` | infrastructure, `deploy`, `quality-check setup-ci` |
-| `mattpocock-skills:resolving-merge-conflicts` | `branch`, `pr`, delegate |
+| `mattpocock-skills:resolving-merge-conflicts` (optional) | `branch`, `pr`, delegate |
 | `mattpocock-skills:writing-for-agents` | onboard, `docs` |
 | `/setup-matt-pocock-skills` | `start`, onboard (tracker and domain docs setup) |
 | `security-review` (built in) | security-sensitive modifier |

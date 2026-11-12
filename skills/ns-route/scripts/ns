@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import statistics
+import subprocess
 import sys
 import tempfile
 import time
@@ -648,7 +649,8 @@ def help_screen():
             c("phase", "One line for the current run (flows print it)"),
             c("sessions", "List recent sessions that used ns-* skills"),
             c("demo", "Replay a sample run, add --live to watch it fill"),
-            c("selftest", "Check the reader against a built-in sample"), "",
+            c("selftest", "Check the reader against a built-in sample"),
+            c("doctor", "Check that the tools the skills use are installed"), "",
             t("TRY IT"),
             "  " + dim("%") + " ns demo --live", "  " + dim("%") + " ns usage", "  " + dim("%") + " ns trend --days 14",
             "  " + dim("%") + " ns calls --top 15", "  " + dim("%") + " ns watch", "",
@@ -951,6 +953,136 @@ def half_line_ok(root):
     return before == 0 and len(rd.refresh().calls) == 1
 
 
+# ---------------------------------------------------------------- doctor: the tools the skills use
+
+SETUP_URL = "https://raw.githubusercontent.com/npranto/ns-skills/main/scripts/setup-tools.sh"
+DOCTOR_GROUPS = [("core", "CORE"), ("ui", "UI PROOF (ns-to-verify)"), ("delegate", "DELEGATE (ns-flow-delegate)"),
+                 ("vercel", "VERCEL (only for projects on Vercel)"), ("plugins", "PLUGIN SKILLS")]
+
+
+def _run(cmd, timeout=10):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    except Exception:
+        return 1, ""
+
+
+def _has(name):
+    def fn(full):
+        w = shutil.which(name)
+        return (True, w) if w else (False, "not found")
+    return fn
+
+
+def _node(full):
+    if not shutil.which("node"):
+        return False, "not found"
+    rc, out = _run(["node", "--version"])
+    m = re.match(r"v(\d+)", out)
+    if m and int(m.group(1)) >= 20:
+        return True, out
+    return False, "%s (needs 20 or newer)" % (out or "unknown version")
+
+
+def _python(full):
+    ok = sys.version_info >= (3, 9)
+    v = "%d.%d.%d" % sys.version_info[:3]
+    return ok, v if ok else "%s (needs 3.9 or newer)" % v
+
+
+def _gh(full):
+    w = shutil.which("gh")
+    if not w:
+        return False, "not found"
+    if full and _run(["gh", "auth", "status"])[0] != 0:
+        return False, "installed, not logged in (gh auth login)"
+    return True, w
+
+
+def _via_npx(full):
+    ok, d = _node(full)
+    return (True, "runs through npx") if ok and shutil.which("npx") else (False, "needs Node 20+ and npx")
+
+
+def _chrome(full):
+    for p in ("/Applications/Google Chrome.app", "/Applications/Chromium.app", os.path.join(HOME, "Applications", "Google Chrome.app")):
+        if os.path.exists(p):
+            return True, p
+    for n in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        w = shutil.which(n)
+        if w:
+            return True, w
+    return False, "not found"
+
+
+def _plugin(full):
+    roots = [os.path.join(HOME, ".agents", "skills"), os.path.join(HOME, ".claude", "skills"),
+             os.path.join(os.getcwd(), ".claude", "skills"), os.path.join(os.getcwd(), ".agents", "skills")]
+    if glob.glob(os.path.join(HOME, ".claude", "plugins", "cache", "*", "mattpocock-skills")):
+        return True, "Claude Code plugin"
+    for r in roots:
+        if os.path.isdir(os.path.join(r, "grilling")):
+            return True, r
+    return False, "not found"
+
+
+# group, name, check, how to fix
+DOCTOR_TOOLS = [
+    ("core", "git", _has("git"), "brew install git"),
+    ("core", "node", _node, "brew install node (20 or newer)"),
+    ("core", "python3", _python, "install Python 3.9 or newer"),
+    ("core", "gh", _gh, "brew install gh, then gh auth login"),
+    ("core", "gh-axi", _via_npx, "needs Node 20+ (runs through npx -y gh-axi)"),
+    ("ui", "playwright-cli", _has("playwright-cli"), "npm i -g @playwright/cli"),
+    ("ui", "chrome-devtools-axi", _via_npx, "needs Node 20+ (runs through npx -y chrome-devtools-axi)"),
+    ("ui", "chrome", _chrome, "install Google Chrome"),
+    ("ui", "lighthouse", _has("lighthouse"), "npm i -g lighthouse"),
+    ("ui", "ffmpeg", _has("ffmpeg"), "brew install ffmpeg"),
+    ("ui", "axe", _has("axe"), "npm i -g @axe-core/cli"),
+    ("delegate", "herdr", _has("herdr"), "brew install herdr"),
+    ("delegate", "claude", _has("claude"), "install Claude Code"),
+    ("vercel", "vercel", _has("vercel"), "npm i -g vercel"),
+    ("plugins", "mattpocock-skills", _plugin, "Claude Code: claude plugin install mattpocock-skills@claude-plugins-official; others: npx skills add mattpocock/skills -g"),
+]
+
+
+def doctor_rows(quiet):
+    rows = []
+    for g, name, fn, fix in DOCTOR_TOOLS:
+        if quiet and g not in ("core", "ui"):
+            continue
+        ok, detail = fn(not quiet)
+        rows.append((g, name, ok, detail, fix))
+    return rows
+
+
+def cmd_doctor(a):
+    rows = doctor_rows(a.quiet)
+    missing = [r for r in rows if not r[2]]
+    if a.quiet:
+        if missing:
+            print("ns doctor: %d tool%s missing (%s). Run: python3 ../ns-route/scripts/ns doctor" % (
+                len(missing), "" if len(missing) == 1 else "s", ", ".join(r[1] for r in missing)))
+        return
+    print("\n  " + head("ns doctor") + dim("  the tools the ns skills use\n"))
+    for g, label in DOCTOR_GROUPS:
+        grp = [r for r in rows if r[0] == g]
+        print("  " + head(label))
+        for _, name, ok, detail, fix in grp:
+            print("    %s %s %s%s" % (good("✓") if ok else bad("✗"), pad(name, 20), dim(detail),
+                                      "" if ok else "  " + warn("fix: " + fix)))
+        print()
+    print("  %d of %d present." % (len(rows) - len(missing), len(rows)))
+    if missing:
+        print("  Install what is missing: " + bold("bash scripts/setup-tools.sh") + " from a clone of the repo, or")
+        print("  " + bold("curl -fsSL %s | bash" % SETUP_URL) + "\n")
+    else:
+        print("  " + good("nothing missing") + "\n")
+    if any(r[0] == "core" and not r[2] for r in rows):
+        sys.exit(1)
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -986,6 +1118,8 @@ def main():
     p.add_argument("--live", action="store_true", help="replay it into a transcript and watch it fill in")
     p.add_argument("--speed", type=float, default=240, help="simulated seconds per real second for --live")
     add("selftest", cmd_selftest, help="check the reader against a built-in sample")
+    p = add("doctor", cmd_doctor, help="check that the tools the skills use are installed")
+    p.add_argument("--quiet", action="store_true", help="core and UI tools only, no network or login checks; print one line only when something is missing")
     add("help", None, help="show the overview")
 
     if sys.argv[1:] in (["-h"], ["--help"]):

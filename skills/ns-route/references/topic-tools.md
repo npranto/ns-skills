@@ -15,7 +15,7 @@ Invoke these with the harness's skill-invocation tool when a phase calls for the
 | Deep-module design vocabulary | `mattpocock-skills:codebase-design` |
 | Standards + spec review of a diff | `mattpocock-skills:code-review` |
 | Human-only setup steps (dashboards, secrets) | `mattpocock-skills:wizard` |
-| Merge or rebase conflicts | `mattpocock-skills:resolving-merge-conflicts` |
+| Merge or rebase conflicts | `mattpocock-skills:resolving-merge-conflicts` (if the plugin has it; else plain git, each resolution approved) |
 | Writing or editing skills, AGENTS.md, CLAUDE.md | `mattpocock-skills:writing-for-agents` |
 | Issue tracker + domain docs setup (`/setup-matt-pocock-skills`) | run if present, else create `docs/agents/*.md` by hand |
 
@@ -30,5 +30,5 @@ The defaults below are exactly what the skills use today. A tool is installed wh
 | Performance and web vitals | the Lighthouse CLI | verify | the same |
 | Convert clips | `ffmpeg` | verify | the same |
 | GitHub: issues, PRs, CI | `gh-axi` | several phases | no fallback is stated; report it at the step |
-| Run agents in worktrees | `herdr` (the CLI and its skill) | `ns-flow-delegate` only | "Not inside Herdr: say so and ask: open Herdr and run this again (Recommended), or run the ticket here with `/ns-flow-ticket` instead." |
+| Run agents in worktrees | `herdr` (the CLI; its usage guide is `../ns-route/references/herdr.md`) | `ns-flow-delegate` only | "Not inside Herdr: say so and ask: open Herdr and run this again (Recommended), or run the ticket here with `/ns-flow-ticket` instead." |
 | Plugin skills | `mattpocock-skills:*` | many phases | follow the philosophy inline and say so (the rule above) |
