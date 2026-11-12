@@ -1,6 +1,6 @@
 {
   "name": "ns-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lean, generic Agent Skills: a router, flows and phases that take engineering work from idea to production with human gates.",
   "prefix": "ns",
   "skills": [
